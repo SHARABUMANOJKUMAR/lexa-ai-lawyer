@@ -1,8 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+// Allowed origins for CORS - restrict to app domains
+const ALLOWED_ORIGINS = [
+  'https://ratlfzpryvunqzqmbuvk.lovableproject.com',
+  'https://lovable.dev',
+  'http://localhost:5173',
+  'http://localhost:8080',
+];
+
+const getCorsHeaders = (origin: string | null) => {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed.replace(/\/$/, ''))) 
+    ? origin 
+    : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
 };
 
 const LEGAL_SYSTEM_PROMPT = `You are AI LeXa Lawyer, an advanced AI-powered legal guidance assistant for the Smart Judiciary of India platform. You operate as a multi-agent system with specialized capabilities.
@@ -85,6 +98,9 @@ If the user mentions "sandbox" or asks exploratory questions:
 - Separate clearly from live case advice`;
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

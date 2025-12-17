@@ -1,8 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+// Allowed origins for CORS - restrict to app domains
+const ALLOWED_ORIGINS = [
+  'https://ratlfzpryvunqzqmbuvk.lovableproject.com',
+  'https://lovable.dev',
+  'http://localhost:5173',
+  'http://localhost:8080',
+];
+
+const getCorsHeaders = (origin: string | null) => {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.some(allowed => origin.startsWith(allowed.replace(/\/$/, ''))) 
+    ? origin 
+    : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  };
 };
 
 const FIR_GENERATION_PROMPT = `You are the FIR & Legal Drafting Agent for AI LeXa Lawyer - Smart Judiciary of India. Generate a formal First Information Report (FIR) draft in proper Indian legal format.
@@ -40,6 +53,9 @@ You are a specialized AI agent responsible for drafting official legal documents
 Generate a complete, professional, court-admissible FIR draft based on the provided information.`;
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
