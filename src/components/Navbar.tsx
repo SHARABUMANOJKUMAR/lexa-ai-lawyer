@@ -23,6 +23,7 @@ const navItems = [
   { path: "/chat", label: "AI Legal Chat", icon: MessageSquare },
   { path: "/case-intake", label: "New Case", icon: FileText },
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { path: "/lawyer-portal", label: "Lawyer Portal", icon: Users },
 ];
 
 export const Navbar: React.FC = () => {

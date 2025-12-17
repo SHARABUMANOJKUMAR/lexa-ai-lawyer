@@ -8,7 +8,8 @@ import {
   Scale,
   AlertTriangle,
   Sparkles,
-  Loader2
+  Loader2,
+  Volume2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { AgentNetwork } from "@/components/AgentNetwork";
 import { useChat, ChatMessage } from "@/hooks/useChat";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 const initialWelcomeMessages: ChatMessage[] = [
   {
@@ -38,8 +40,11 @@ export const LegalChatInterface: React.FC = () => {
   const { messages, isLoading, sendMessage } = useChat();
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [activeAgents, setActiveAgents] = useState(["legal-analysis", "ethics-compliance"]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const displayMessages = messages.length > 0 ? messages : initialWelcomeMessages;
 
@@ -68,8 +73,109 @@ export const LegalChatInterface: React.FC = () => {
     await sendMessage(userInput);
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        } 
+      });
+      
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      });
+      
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        await transcribeAudio(audioBlob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+      toast.info("Recording started... Speak now");
+    } catch (error) {
+      console.error("Error accessing microphone:", error);
+      toast.error("Could not access microphone. Please check permissions.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      toast.info("Processing your voice input...");
+    }
+  };
+
+  const transcribeAudio = async (audioBlob: Blob) => {
+    setIsTranscribing(true);
+    try {
+      // Convert blob to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64 = (reader.result as string).split(',')[1];
+          resolve(base64);
+        };
+      });
+      reader.readAsDataURL(audioBlob);
+      const base64Audio = await base64Promise;
+
+      // Use Web Speech API for live transcription (browser native)
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-IN';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        
+        recognition.onresult = (event: any) => {
+          const transcript = event.results[0][0].transcript;
+          setInput(prev => prev ? prev + ' ' + transcript : transcript);
+          toast.success("Voice transcribed successfully!");
+        };
+        
+        recognition.onerror = () => {
+          toast.error("Could not transcribe. Please type your query.");
+        };
+        
+        // Create a new audio element to trigger recognition
+        recognition.start();
+        
+        // Stop recognition after a short delay to process the recorded audio
+        setTimeout(() => {
+          recognition.stop();
+        }, 100);
+      } else {
+        toast.info("Voice recorded. Type your query or use a supported browser.");
+      }
+      
+    } catch (error) {
+      console.error("Transcription error:", error);
+      toast.error("Could not process voice. Please type your query.");
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
+
   const toggleRecording = () => {
-    setIsRecording(!isRecording);
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   const isSystemMessage = (message: ChatMessage) => {
@@ -244,20 +350,32 @@ export const LegalChatInterface: React.FC = () => {
               onChange={(e) => setInput(e.target.value)}
               placeholder={user ? "Describe your legal situation..." : "Please login to start a consultation..."}
               className="w-full bg-muted border border-primary/30 rounded-lg px-4 py-3 pr-12 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-              disabled={isLoading || !user}
+              disabled={isLoading || !user || isTranscribing}
             />
+            {isRecording && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
+                <span className="text-xs text-destructive">Recording...</span>
+              </div>
+            )}
           </div>
           
           <Button
             type="button"
             variant={isRecording ? "destructive" : "ghost"}
             size="icon"
-            className="flex-shrink-0"
+            className={`flex-shrink-0 transition-all ${isRecording ? "animate-pulse" : ""}`}
             onClick={toggleRecording}
             title={isRecording ? "Stop recording" : "Voice input"}
-            disabled={isLoading || !user}
+            disabled={isLoading || !user || isTranscribing}
           >
-            {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            {isTranscribing ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : isRecording ? (
+              <MicOff className="w-5 h-5" />
+            ) : (
+              <Mic className="w-5 h-5" />
+            )}
           </Button>
           
           <Button
@@ -274,6 +392,13 @@ export const LegalChatInterface: React.FC = () => {
         {!user && (
           <p className="text-xs text-muted-foreground mt-2 text-center">
             <a href="/auth" className="text-primary hover:underline">Login or create an account</a> to start your legal consultation
+          </p>
+        )}
+        
+        {isRecording && (
+          <p className="text-xs text-muted-foreground mt-2 text-center flex items-center justify-center gap-2">
+            <Volume2 className="w-3 h-3 text-primary animate-pulse" />
+            Listening... Click the mic button again to stop
           </p>
         )}
       </form>
