@@ -9,14 +9,18 @@ import {
   AlertTriangle,
   Sparkles,
   Loader2,
-  Volume2,
   X,
   FileText,
   Image,
   File,
-  Upload,
-  Brain,
-  Beaker
+  Beaker,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  CheckCircle,
+  AlertCircle,
+  HelpCircle,
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,7 +28,6 @@ import { Badge } from "@/components/ui/badge";
 import { AgentNetwork } from "@/components/AgentNetwork";
 import { useChat, ChatMessage } from "@/hooks/useChat";
 import { useAuth } from "@/hooks/useAuth";
-import { useEvidence } from "@/hooks/useEvidence";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
@@ -35,6 +38,7 @@ interface UploadedFile {
   size: number;
   preview?: string;
   file: File;
+  status: 'uploading' | 'success' | 'error';
 }
 
 const initialWelcomeMessages: ChatMessage[] = [
@@ -47,37 +51,48 @@ const initialWelcomeMessages: ChatMessage[] = [
   {
     id: "welcome-2",
     role: "assistant",
-    content: `Namaste! I'm AI LeXa, your legal guidance assistant. I operate as a **multi-agent system** with specialized agents for:
+    content: `**Namaste!** I am AI LeXa, your trusted legal guidance assistant.
 
-• **Legal Analysis Agent** - Classifies issues & maps IPC/BNS/CrPC sections
-• **FIR & Legal Drafting Agent** - Generates formal legal documents
-• **Risk & Consequence Agent** - Explains bail, arrest risk, penalties
-• **False Case Defense Agent** - Analyzes accusations & weak claims
-• **Ethics & Compliance Agent** - Ensures proper disclaimers
+I operate as a **multi-agent system** with specialized capabilities to serve you better:
 
-**How to use:**
-- Type your legal question or describe your situation
-- Upload evidence files (images, PDFs, documents)
-- Use voice input by clicking the microphone
-- Try "AI Sandbox Mode" for structured legal exploration
+• **Legal Analysis Agent** — Classifies your legal issues and identifies applicable IPC/BNS/CrPC sections
+• **FIR & Legal Drafting Agent** — Generates formal legal documents in proper Indian format
+• **Risk & Consequence Agent** — Explains bail status, arrest risk, and penalties clearly
+• **False Case Defense Agent** — Analyzes accusations and identifies weak claims
+• **Ethics & Compliance Agent** — Ensures proper disclaimers and responsible guidance
 
-How may I assist you today?`,
+**How to get started:**
+1. Describe your legal situation in detail
+2. Upload any relevant documents (images, PDFs)
+3. Use voice input by clicking the microphone
+4. Try **AI Sandbox Mode** for educational exploration
+
+**I am here to help you understand your rights and guide you through the legal process. How may I assist you today?**`,
     agent_name: "UX Orchestrator Agent",
     created_at: new Date().toISOString(),
+    confidence: "HIGH",
   },
+];
+
+const sandboxCategories = [
+  { id: "criminal", label: "Criminal Law", icon: "⚖️", description: "IPC offenses, theft, assault, fraud" },
+  { id: "civil", label: "Civil Matters", icon: "📋", description: "Property disputes, contracts, recovery" },
+  { id: "family", label: "Family Law", icon: "👨‍👩‍👧", description: "Divorce, custody, maintenance" },
+  { id: "property", label: "Property Law", icon: "🏠", description: "Land, inheritance, registration" },
+  { id: "consumer", label: "Consumer Rights", icon: "🛒", description: "Complaints, refunds, remedies" },
+  { id: "cyber", label: "Cyber Crime", icon: "💻", description: "Online fraud, hacking, harassment" },
 ];
 
 export const LegalChatInterface: React.FC = () => {
   const { user } = useAuth();
-  const { messages, isLoading, sendMessage } = useChat();
-  const { uploadEvidence, analyzeEvidence, analyzing } = useEvidence();
+  const { messages, isLoading, sendMessage, cancelRequest, error } = useChat();
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [activeAgents, setActiveAgents] = useState(["legal-analysis", "ethics-compliance"]);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [showSandbox, setShowSandbox] = useState(false);
-  const [sandboxCategory, setSandboxCategory] = useState("");
+  const [expandedReasoning, setExpandedReasoning] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -105,17 +120,13 @@ export const LegalChatInterface: React.FC = () => {
     e.preventDefault();
     if ((!input.trim() && uploadedFiles.length === 0) || isLoading) return;
 
-    let userInput = input;
+    const attachedFiles = uploadedFiles.map(f => ({ name: f.name, type: f.type }));
+    const currentInput = input;
     
-    // Include file references in the message
-    if (uploadedFiles.length > 0) {
-      const fileDescriptions = uploadedFiles.map(f => `[Attached: ${f.name} (${f.type})]`).join('\n');
-      userInput = `${fileDescriptions}\n\n${input}`.trim();
-    }
-
     setInput("");
     setUploadedFiles([]);
-    await sendMessage(userInput);
+    
+    await sendMessage(currentInput, attachedFiles.length > 0 ? attachedFiles : undefined);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,7 +140,20 @@ export const LegalChatInterface: React.FC = () => {
       
       // Validate file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} is too large. Max size is 10MB.`);
+        toast.error(`${file.name} is too large`, {
+          description: "Maximum file size is 10MB",
+        });
+        continue;
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument'];
+      const isAllowed = allowedTypes.some(type => file.type.startsWith(type) || file.type.includes(type));
+      
+      if (!isAllowed) {
+        toast.error(`${file.name} type not supported`, {
+          description: "Please upload images, PDFs, or documents",
+        });
         continue;
       }
 
@@ -139,6 +163,7 @@ export const LegalChatInterface: React.FC = () => {
         type: file.type,
         size: file.size,
         file: file,
+        status: 'success',
       };
 
       // Create preview for images
@@ -155,8 +180,12 @@ export const LegalChatInterface: React.FC = () => {
       newFiles.push(uploadedFile);
     }
 
-    setUploadedFiles(prev => [...prev, ...newFiles]);
-    toast.success(`${newFiles.length} file(s) attached`);
+    if (newFiles.length > 0) {
+      setUploadedFiles(prev => [...prev, ...newFiles]);
+      toast.success(`${newFiles.length} file(s) attached successfully`, {
+        description: "Files will be referenced in your message",
+      });
+    }
     
     // Reset input
     if (fileInputRef.current) {
@@ -166,11 +195,12 @@ export const LegalChatInterface: React.FC = () => {
 
   const removeFile = (fileId: string) => {
     setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+    toast.info("File removed");
   };
 
   const getFileIcon = (type: string) => {
     if (type.startsWith('image/')) return <Image className="w-4 h-4" />;
-    if (type.includes('pdf')) return <FileText className="w-4 h-4" />;
+    if (type.includes('pdf')) return <FileText className="w-4 h-4 text-destructive" />;
     return <File className="w-4 h-4" />;
   };
 
@@ -210,10 +240,14 @@ export const LegalChatInterface: React.FC = () => {
       
       mediaRecorder.start();
       setIsRecording(true);
-      toast.info("Recording started... Speak now");
+      toast.info("Recording started", {
+        description: "Speak clearly into your microphone",
+      });
     } catch (error) {
       console.error("Error accessing microphone:", error);
-      toast.error("Could not access microphone. Please check permissions.");
+      toast.error("Microphone access denied", {
+        description: "Please allow microphone access in your browser settings",
+      });
     }
   };
 
@@ -237,12 +271,14 @@ export const LegalChatInterface: React.FC = () => {
       recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
         setInput(prev => prev ? prev + ' ' + transcript : transcript);
-        toast.success("Voice transcribed!");
+        toast.success("Voice transcribed successfully");
         setIsTranscribing(false);
       };
       
       recognition.onerror = () => {
-        toast.error("Could not transcribe. Please type your query.");
+        toast.error("Could not transcribe audio", {
+          description: "Please type your query instead",
+        });
         setIsTranscribing(false);
       };
       
@@ -252,7 +288,9 @@ export const LegalChatInterface: React.FC = () => {
       
       recognition.start();
     } else {
-      toast.info("Voice recognition not supported. Please type your query.");
+      toast.info("Voice recognition not supported", {
+        description: "Please type your query instead",
+      });
       setIsTranscribing(false);
     }
   };
@@ -275,52 +313,130 @@ export const LegalChatInterface: React.FC = () => {
     return matches ? [...new Set(matches)] : [];
   };
 
+  const getConfidenceBadge = (confidence?: 'HIGH' | 'MEDIUM' | 'LOW') => {
+    if (!confidence) return null;
+    
+    const configs = {
+      HIGH: { icon: CheckCircle, color: 'bg-success/20 text-success border-success/30', label: 'High Confidence' },
+      MEDIUM: { icon: AlertCircle, color: 'bg-warning/20 text-warning border-warning/30', label: 'Medium Confidence' },
+      LOW: { icon: HelpCircle, color: 'bg-muted text-muted-foreground border-muted', label: 'Low Confidence' },
+    };
+    
+    const config = configs[confidence];
+    const Icon = config.icon;
+    
+    return (
+      <Badge variant="outline" className={`text-xs flex items-center gap-1 ${config.color}`}>
+        <Icon className="w-3 h-3" />
+        {config.label}
+      </Badge>
+    );
+  };
+
   const handleSandboxExplore = (category: string) => {
-    setSandboxCategory(category);
     const prompts: Record<string, string> = {
-      criminal: "I want to understand criminal law in India. Explain IPC sections for common offenses like theft, assault, and fraud. What are the typical punishments?",
-      civil: "Explain civil law procedures in India. How do property disputes, contract breaches, and recovery suits work?",
-      family: "What are my rights in family law matters? Explain divorce, maintenance, custody, and domestic violence laws in India.",
-      property: "Guide me through property law in India. How do land registration, inheritance, and property disputes work?",
-      consumer: "What are consumer rights in India? How do I file a complaint and what remedies are available?",
-      cyber: "Explain cyber crime laws in India. What constitutes cyber fraud, hacking, and online harassment?",
+      criminal: "[SANDBOX MODE - Educational Exploration]\n\nI want to understand criminal law in India. Please explain the common IPC sections for offenses like theft, assault, and fraud. What are the typical punishments and bail provisions?",
+      civil: "[SANDBOX MODE - Educational Exploration]\n\nExplain civil law procedures in India. How do property disputes, contract breaches, and recovery suits work? What is the typical timeline and process?",
+      family: "[SANDBOX MODE - Educational Exploration]\n\nWhat are my rights in family law matters? Explain divorce procedures, maintenance laws, custody rights, and domestic violence protections under Indian law.",
+      property: "[SANDBOX MODE - Educational Exploration]\n\nGuide me through property law in India. How do land registration, inheritance rules, and property dispute resolution work?",
+      consumer: "[SANDBOX MODE - Educational Exploration]\n\nWhat are consumer rights in India under the Consumer Protection Act 2019? How do I file a complaint and what remedies are available?",
+      cyber: "[SANDBOX MODE - Educational Exploration]\n\nExplain cyber crime laws in India under the IT Act 2000. What constitutes cyber fraud, hacking, and online harassment? What are the penalties?",
     };
     
     setInput(prompts[category] || "");
     setShowSandbox(false);
-    toast.info(`Sandbox mode: ${category} law exploration`);
+    toast.info("Sandbox Mode Activated", {
+      description: "Exploring educational legal information",
+    });
   };
 
-  const renderMessageContent = (content: string) => {
-    // Simple markdown-like rendering
-    return content.split('\n').map((line, i) => {
-      // Headers
-      if (line.startsWith('###')) {
-        return <h4 key={i} className="font-semibold text-primary mt-3 mb-1">{line.replace(/^###\s*/, '')}</h4>;
-      }
-      if (line.startsWith('##')) {
-        return <h3 key={i} className="font-semibold text-lg mt-4 mb-2">{line.replace(/^##\s*/, '')}</h3>;
-      }
-      // Bullet points
-      if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) {
-        const text = line.replace(/^[•\-\*]\s*/, '');
-        return (
-          <div key={i} className="flex items-start gap-2 my-1">
-            <span className="text-primary mt-1">•</span>
-            <span dangerouslySetInnerHTML={{ __html: text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary">$1</strong>') }} />
+  const renderMessageContent = (content: string, messageId: string, hasReasoning?: boolean) => {
+    // Extract AI Reasoning section if present
+    const reasoningMatch = content.match(/\*\*AI Reasoning\*\*[:\s]*\n?([\s\S]*?)(?=\n\*\*Disclaimer\*\*|\n---|\n\*\*7\.|$)/i);
+    const reasoning = reasoningMatch ? reasoningMatch[0] : null;
+    
+    // Content without the reasoning section for initial display
+    const mainContent = reasoning 
+      ? content.replace(reasoning, '').replace(/\n{3,}/g, '\n\n')
+      : content;
+
+    return (
+      <div className="space-y-2">
+        {mainContent.split('\n').map((line, i) => {
+          // Headers
+          if (line.startsWith('###')) {
+            return <h4 key={i} className="font-semibold text-primary mt-3 mb-1 text-sm">{line.replace(/^###\s*/, '')}</h4>;
+          }
+          if (line.startsWith('##')) {
+            return <h3 key={i} className="font-semibold text-base mt-4 mb-2">{line.replace(/^##\s*/, '')}</h3>;
+          }
+          // Numbered items
+          if (/^\d+\./.test(line)) {
+            const text = line.replace(/^\d+\.\s*/, '');
+            return (
+              <div key={i} className="flex items-start gap-2 my-1 pl-2">
+                <span className="text-primary font-medium min-w-[20px]">{line.match(/^\d+/)?.[0]}.</span>
+                <span dangerouslySetInnerHTML={{ __html: text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary">$1</strong>') }} />
+              </div>
+            );
+          }
+          // Bullet points
+          if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) {
+            const text = line.replace(/^[•\-\*]\s*/, '');
+            return (
+              <div key={i} className="flex items-start gap-2 my-1 pl-4">
+                <span className="text-primary mt-1.5 w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                <span dangerouslySetInnerHTML={{ __html: text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary">$1</strong>') }} />
+              </div>
+            );
+          }
+          // Bold text
+          if (line.includes('**')) {
+            return <p key={i} className="my-1" dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary">$1</strong>') }} />;
+          }
+          // Empty lines
+          if (!line.trim()) {
+            return <div key={i} className="h-2" />;
+          }
+          return <p key={i} className="my-1 leading-relaxed">{line}</p>;
+        })}
+        
+        {/* Expandable AI Reasoning Section */}
+        {hasReasoning && reasoning && (
+          <div className="mt-4 border-t border-primary/20 pt-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-between text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setExpandedReasoning(expandedReasoning === messageId ? null : messageId)}
+            >
+              <span className="flex items-center gap-2">
+                <Info className="w-3 h-3" />
+                Why this response? (AI Reasoning)
+              </span>
+              {expandedReasoning === messageId ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </Button>
+            
+            {expandedReasoning === messageId && (
+              <div className="mt-2 p-3 bg-muted/50 rounded-lg text-sm animate-fade-in">
+                {reasoning.split('\n').map((line, i) => {
+                  if (!line.trim() || line.includes('**AI Reasoning**')) return null;
+                  if (line.startsWith('-') || line.startsWith('•')) {
+                    return (
+                      <div key={i} className="flex items-start gap-2 my-1">
+                        <span className="text-primary">•</span>
+                        <span dangerouslySetInnerHTML={{ __html: line.replace(/^[-•]\s*/, '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                      </div>
+                    );
+                  }
+                  return <p key={i} className="my-1" dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />;
+                })}
+              </div>
+            )}
           </div>
-        );
-      }
-      // Bold text
-      if (line.includes('**')) {
-        return <p key={i} className="my-1" dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary">$1</strong>') }} />;
-      }
-      // Empty lines
-      if (!line.trim()) {
-        return <div key={i} className="h-2" />;
-      }
-      return <p key={i} className="my-1">{line}</p>;
-    });
+        )}
+      </div>
+    );
   };
 
   return (
@@ -377,11 +493,17 @@ export const LegalChatInterface: React.FC = () => {
                 </div>
               )}
               
-              <div className={`max-w-[80%] ${message.role === "user" ? "order-first" : ""}`}>
-                {message.agent_name && !isDisclaimer && (
-                  <Badge variant="agent" className="text-xs mb-1">
-                    {message.agent_name}
-                  </Badge>
+              <div className={`max-w-[85%] ${message.role === "user" ? "order-first" : ""}`}>
+                {/* Agent badge and confidence */}
+                {message.role === "assistant" && !isDisclaimer && (
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    {message.agent_name && (
+                      <Badge variant="agent" className="text-xs">
+                        {message.agent_name}
+                      </Badge>
+                    )}
+                    {getConfidenceBadge(message.confidence)}
+                  </div>
                 )}
                 
                 <Card 
@@ -401,7 +523,7 @@ export const LegalChatInterface: React.FC = () => {
                   }`}
                 >
                   <div className={`text-sm ${isDisclaimer ? "text-secondary-foreground" : ""}`}>
-                    {renderMessageContent(message.content)}
+                    {renderMessageContent(message.content, message.id, message.hasReasoning)}
                   </div>
                   
                   {sections.length > 0 && (
@@ -435,20 +557,48 @@ export const LegalChatInterface: React.FC = () => {
         {isLoading && (
           <div className="flex gap-3 animate-fade-in">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-gold-light flex items-center justify-center">
-              <Scale className="w-5 h-5 text-primary-foreground" />
+              <Scale className="w-5 h-5 text-primary-foreground animate-pulse" />
             </div>
-            <Card variant="glass" className="p-4">
-              <div className="flex items-center gap-2">
+            <Card variant="glass" className="p-4 max-w-[80%]">
+              <div className="flex items-center gap-3">
                 <Loader2 className="w-4 h-4 animate-spin text-primary" />
                 <span className="text-sm text-muted-foreground">AI agents analyzing your query...</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-xs text-muted-foreground"
+                  onClick={cancelRequest}
+                >
+                  Cancel
+                </Button>
               </div>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex gap-2 flex-wrap">
                 {activeAgents.map(agent => (
                   <Badge key={agent} variant="outline" className="text-xs animate-pulse">
                     {agent.replace('-', ' ')}
                   </Badge>
                 ))}
               </div>
+            </Card>
+          </div>
+        )}
+
+        {error && (
+          <div className="flex gap-3 animate-fade-in">
+            <div className="w-10 h-10 rounded-full bg-destructive/20 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+            </div>
+            <Card variant="glass" className="p-4 border-destructive/50">
+              <p className="text-sm text-destructive">{error}</p>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="mt-2"
+                onClick={() => window.location.reload()}
+              >
+                <RefreshCw className="w-3 h-3 mr-1" />
+                Refresh
+              </Button>
             </Card>
           </div>
         )}
@@ -459,11 +609,16 @@ export const LegalChatInterface: React.FC = () => {
       {/* Uploaded Files Preview */}
       {uploadedFiles.length > 0 && (
         <div className="px-4 py-2 border-t border-primary/20 bg-muted/20">
+          <p className="text-xs text-muted-foreground mb-2">Attached files ({uploadedFiles.length}):</p>
           <div className="flex flex-wrap gap-2">
             {uploadedFiles.map(file => (
               <div 
                 key={file.id}
-                className="flex items-center gap-2 bg-muted border border-primary/30 rounded-lg px-3 py-2"
+                className={`flex items-center gap-2 border rounded-lg px-3 py-2 ${
+                  file.status === 'error' 
+                    ? 'bg-destructive/10 border-destructive/30' 
+                    : 'bg-muted border-primary/30'
+                }`}
               >
                 {file.preview ? (
                   <img src={file.preview} alt={file.name} className="w-8 h-8 object-cover rounded" />
@@ -488,114 +643,75 @@ export const LegalChatInterface: React.FC = () => {
         </div>
       )}
 
-      {/* Quick Actions */}
-      <div className="px-4 py-2 border-t border-primary/20 bg-muted/20">
-        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-          {[
-            "How to file an FIR?",
-            "Explain my rights during arrest",
-            "Draft a legal notice",
-            "What is anticipatory bail?",
-            "False case defense options",
-          ].map((suggestion) => (
-            <Button
-              key={suggestion}
-              variant="outline"
-              size="sm"
-              className="whitespace-nowrap text-xs hover:bg-primary/10"
-              onClick={() => setInput(suggestion)}
-              disabled={isLoading}
-            >
-              {suggestion}
-            </Button>
-          ))}
-        </div>
-      </div>
-
       {/* Input Area */}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-primary/20 bg-card">
-        <div className="flex items-center gap-2">
+      <form onSubmit={handleSubmit} className="p-4 border-t border-primary/20 bg-muted/30">
+        <div className="flex gap-2">
           <input
             type="file"
             ref={fileInputRef}
             onChange={handleFileUpload}
             multiple
-            accept="image/*,.pdf,.doc,.docx,.txt"
+            accept="image/*,.pdf,.doc,.docx"
             className="hidden"
           />
+          
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             size="icon"
-            className="flex-shrink-0"
-            title="Attach evidence"
-            disabled={isLoading}
             onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading}
+            title="Attach files (images, PDF, documents)"
           >
-            <Paperclip className="w-5 h-5" />
+            <Paperclip className="w-4 h-4" />
           </Button>
           
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={user ? "Describe your legal situation..." : "Please login to start a consultation..."}
-              className="w-full bg-muted border border-primary/30 rounded-lg px-4 py-3 pr-12 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all"
-              disabled={isLoading || !user || isTranscribing}
-            />
-            {isRecording && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-                <span className="text-xs text-destructive">Recording...</span>
-              </div>
-            )}
-          </div>
-          
           <Button
             type="button"
-            variant={isRecording ? "destructive" : "ghost"}
+            variant={isRecording ? "destructive" : "outline"}
             size="icon"
-            className={`flex-shrink-0 transition-all ${isRecording ? "animate-pulse" : ""}`}
             onClick={toggleRecording}
-            title={isRecording ? "Stop recording" : "Voice input"}
-            disabled={isLoading || !user || isTranscribing}
+            disabled={isLoading || isTranscribing}
+            title={isRecording ? "Stop recording" : "Start voice input"}
           >
             {isTranscribing ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
             ) : isRecording ? (
-              <MicOff className="w-5 h-5" />
+              <MicOff className="w-4 h-4" />
             ) : (
-              <Mic className="w-5 h-5" />
+              <Mic className="w-4 h-4" />
             )}
           </Button>
+          
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={isRecording ? "Recording... Click mic to stop" : "Describe your legal situation..."}
+            className="flex-1 bg-muted border border-primary/30 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+            disabled={isLoading || isRecording}
+          />
           
           <Button
             type="submit"
             variant="hero"
             size="icon"
-            className="flex-shrink-0"
-            disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading || !user}
+            disabled={(!input.trim() && uploadedFiles.length === 0) || isLoading}
           >
-            <Send className="w-5 h-5" />
+            {isLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
           </Button>
         </div>
         
-        {!user && (
-          <p className="text-xs text-muted-foreground mt-2 text-center">
-            <a href="/auth" className="text-primary hover:underline">Login or create an account</a> to start your legal consultation
-          </p>
-        )}
-        
-        {isRecording && (
-          <p className="text-xs text-muted-foreground mt-2 text-center flex items-center justify-center gap-2">
-            <Volume2 className="w-3 h-3 text-primary animate-pulse" />
-            Listening... Click the mic button again to stop
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          AI LeXa provides legal guidance, not legal advice. Consult a qualified advocate for specific matters.
+        </p>
       </form>
 
-      {/* AI Sandbox Dialog */}
+      {/* Sandbox Dialog */}
       <Dialog open={showSandbox} onOpenChange={setShowSandbox}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
@@ -604,35 +720,32 @@ export const LegalChatInterface: React.FC = () => {
               AI Sandbox Mode
             </DialogTitle>
             <DialogDescription>
-              Explore Indian legal topics in a structured, guided manner
+              Explore legal topics in a safe educational environment. Sandbox responses are clearly marked as exploratory guidance.
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-            {[
-              { id: 'criminal', label: 'Criminal Law', icon: '⚖️', desc: 'IPC, theft, assault, fraud' },
-              { id: 'civil', label: 'Civil Law', icon: '📜', desc: 'Contracts, property, recovery' },
-              { id: 'family', label: 'Family Law', icon: '👨‍👩‍👧', desc: 'Divorce, custody, maintenance' },
-              { id: 'property', label: 'Property Law', icon: '🏠', desc: 'Land, inheritance, disputes' },
-              { id: 'consumer', label: 'Consumer Rights', icon: '🛒', desc: 'Complaints, refunds, CPGRAMS' },
-              { id: 'cyber', label: 'Cyber Crime', icon: '💻', desc: 'IT Act, fraud, harassment' },
-            ].map(category => (
-              <Card 
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            {sandboxCategories.map((category) => (
+              <Button
                 key={category.id}
-                variant="glass"
-                className="p-4 cursor-pointer hover:border-primary/50 transition-all"
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-start gap-2 text-left hover:bg-primary/10 hover:border-primary"
                 onClick={() => handleSandboxExplore(category.id)}
               >
-                <div className="text-2xl mb-2">{category.icon}</div>
-                <h4 className="font-semibold text-sm">{category.label}</h4>
-                <p className="text-xs text-muted-foreground">{category.desc}</p>
-              </Card>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{category.icon}</span>
+                  <span className="font-medium">{category.label}</span>
+                </div>
+                <span className="text-xs text-muted-foreground">{category.description}</span>
+              </Button>
             ))}
           </div>
           
-          <p className="text-xs text-muted-foreground text-center mt-4">
-            Select a category to start guided legal exploration
-          </p>
+          <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+            <p className="text-xs text-muted-foreground">
+              <strong>Note:</strong> Sandbox mode is for educational exploration only. For real legal matters, please provide specific details about your situation.
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
