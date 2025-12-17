@@ -1,20 +1,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { 
-  Scale, 
-  Mail, 
-  Phone, 
-  MapPin,
-  ExternalLink,
-  Twitter,
-  Linkedin,
-  Youtube
-} from "lucide-react";
+import { Scale, Mail, Phone, MapPin, ExternalLink, Twitter, Linkedin, Youtube } from "lucide-react";
 import { AshokaChakra } from "@/components/AshokaChakra";
-
 export const Footer: React.FC = () => {
-  return (
-    <footer className="bg-navy-light border-t border-primary/20">
+  return <footer className="bg-navy-light border-t border-primary/20">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Brand */}
@@ -47,22 +36,26 @@ export const Footer: React.FC = () => {
           <div>
             <h4 className="font-serif font-semibold text-foreground mb-4">Quick Links</h4>
             <ul className="space-y-2">
-              {[
-                { label: "AI Legal Chat", path: "/chat" },
-                { label: "File New Case", path: "/case-intake" },
-                { label: "Citizen Dashboard", path: "/dashboard" },
-                { label: "Find a Lawyer", path: "/lawyers" },
-                { label: "Legal Resources", path: "/resources" },
-              ].map((link) => (
-                <li key={link.path}>
-                  <Link 
-                    to={link.path}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
-                  >
+              {[{
+              label: "AI Legal Chat",
+              path: "/chat"
+            }, {
+              label: "File New Case",
+              path: "/case-intake"
+            }, {
+              label: "Citizen Dashboard",
+              path: "/dashboard"
+            }, {
+              label: "Find a Lawyer",
+              path: "/lawyers"
+            }, {
+              label: "Legal Resources",
+              path: "/resources"
+            }].map(link => <li key={link.path}>
+                  <Link to={link.path} className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
                     {link.label}
                   </Link>
-                </li>
-              ))}
+                </li>)}
             </ul>
           </div>
 
@@ -70,23 +63,27 @@ export const Footer: React.FC = () => {
           <div>
             <h4 className="font-serif font-semibold text-foreground mb-4">Legal Resources</h4>
             <ul className="space-y-2">
-              {[
-                { label: "Indian Penal Code (IPC)", url: "#" },
-                { label: "Bharatiya Nyaya Sanhita (BNS)", url: "#" },
-                { label: "Code of Criminal Procedure", url: "#" },
-                { label: "Indian Constitution", url: "#" },
-                { label: "Supreme Court Judgments", url: "#" },
-              ].map((link) => (
-                <li key={link.label}>
-                  <a 
-                    href={link.url}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
-                  >
+              {[{
+              label: "Indian Penal Code (IPC)",
+              url: "#"
+            }, {
+              label: "Bharatiya Nyaya Sanhita (BNS)",
+              url: "#"
+            }, {
+              label: "Code of Criminal Procedure",
+              url: "#"
+            }, {
+              label: "Indian Constitution",
+              url: "#"
+            }, {
+              label: "Supreme Court Judgments",
+              url: "#"
+            }].map(link => <li key={link.label}>
+                  <a href={link.url} className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
                     {link.label}
                     <ExternalLink className="w-3 h-3" />
                   </a>
-                </li>
-              ))}
+                </li>)}
             </ul>
           </div>
 
@@ -96,17 +93,15 @@ export const Footer: React.FC = () => {
             <ul className="space-y-3">
               <li className="flex items-start gap-2 text-sm text-muted-foreground">
                 <MapPin className="w-4 h-4 mt-0.5 text-primary" />
-                <span>New Delhi, India</span>
+                <span>Andhra Pradesh, India</span>
               </li>
               <li className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Mail className="w-4 h-4 text-primary" />
-                <a href="mailto:support@ailexalawyer.in" className="hover:text-primary transition-colors">
-                  support@ailexalawyer.in
-                </a>
+                <a href="mailto:support@ailexalawyer.in" className="hover:text-primary transition-colors">sharabumanojachari@gmail.com</a>
               </li>
               <li className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Phone className="w-4 h-4 text-primary" />
-                <span>1800-XXX-XXXX (Toll Free)</span>
+                <span>1800-1800-1800 (Toll Free)</span>
               </li>
             </ul>
           </div>
@@ -130,6 +125,5 @@ export const Footer: React.FC = () => {
           </p>
         </div>
       </div>
-    </footer>
-  );
+    </footer>;
 };
