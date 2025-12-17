@@ -3,8 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
-type CaseCategory = 'criminal' | 'civil' | 'family' | 'property' | 'consumer' | 'cyber' | 'labor' | 'constitutional' | 'other';
-type CaseStatus = 'draft' | 'submitted' | 'under_review' | 'assigned' | 'in_progress' | 'resolved' | 'closed';
+export type CaseCategory = 'criminal' | 'civil' | 'family' | 'property' | 'consumer' | 'cyber' | 'labor' | 'constitutional' | 'other';
+export type CaseStatus = 'draft' | 'submitted' | 'under_review' | 'assigned' | 'in_progress' | 'resolved' | 'closed';
 
 export interface Case {
   id: string;
@@ -28,12 +28,12 @@ export interface Case {
 export const useCases = () => {
   const { user } = useAuth();
   const [cases, setCases] = useState<Case[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   const fetchCases = async () => {
     if (!user) {
       setCases([]);
-      setLoading(false);
+      setIsLoading(false);
       return;
     }
 
@@ -49,7 +49,7 @@ export const useCases = () => {
       console.error('Error fetching cases:', error);
       toast.error('Failed to load cases');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -61,16 +61,19 @@ export const useCases = () => {
     title: string;
     description: string;
     category: CaseCategory;
-    incident_date?: string;
+    status?: CaseStatus;
+    incident_date?: string | null;
     incident_location?: string;
     accused_name?: string;
     accused_details?: string;
     ipc_sections?: string[];
     bns_sections?: string[];
-  }) => {
+    crpc_sections?: string[];
+    ai_analysis?: any;
+  }): Promise<{ data: Case | null; error: Error | null }> => {
     if (!user) {
       toast.error('Please login to create a case');
-      return null;
+      return { data: null, error: new Error('Not authenticated') };
     }
 
     try {
@@ -79,7 +82,7 @@ export const useCases = () => {
         .insert({
           ...caseData,
           user_id: user.id,
-          status: 'draft',
+          status: caseData.status || 'draft',
         })
         .select()
         .single();
@@ -88,15 +91,15 @@ export const useCases = () => {
       
       setCases((prev) => [data, ...prev]);
       toast.success('Case created successfully!');
-      return data;
-    } catch (error) {
+      return { data, error: null };
+    } catch (error: any) {
       console.error('Error creating case:', error);
       toast.error('Failed to create case');
-      return null;
+      return { data: null, error };
     }
   };
 
-  const updateCase = async (id: string, updates: Partial<Omit<Case, 'id' | 'created_at' | 'updated_at'>>) => {
+  const updateCase = async (id: string, updates: Partial<Omit<Case, 'id' | 'created_at' | 'updated_at'>>): Promise<{ data: Case | null; error: Error | null }> => {
     try {
       const { data, error } = await supabase
         .from('cases')
@@ -109,15 +112,15 @@ export const useCases = () => {
       
       setCases((prev) => prev.map((c) => (c.id === id ? data : c)));
       toast.success('Case updated successfully!');
-      return data;
-    } catch (error) {
+      return { data, error: null };
+    } catch (error: any) {
       console.error('Error updating case:', error);
       toast.error('Failed to update case');
-      return null;
+      return { data: null, error };
     }
   };
 
-  const deleteCase = async (id: string) => {
+  const deleteCase = async (id: string): Promise<{ error: Error | null }> => {
     try {
       const { error } = await supabase
         .from('cases')
@@ -128,17 +131,17 @@ export const useCases = () => {
       
       setCases((prev) => prev.filter((c) => c.id !== id));
       toast.success('Case deleted successfully!');
-      return true;
-    } catch (error) {
+      return { error: null };
+    } catch (error: any) {
       console.error('Error deleting case:', error);
       toast.error('Failed to delete case');
-      return false;
+      return { error };
     }
   };
 
   return {
     cases,
-    loading,
+    isLoading,
     fetchCases,
     createCase,
     updateCase,
