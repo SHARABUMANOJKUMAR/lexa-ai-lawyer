@@ -1,82 +1,75 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { 
-  Scale, 
-  MessageSquare, 
-  FileText, 
-  Shield, 
-  Users, 
-  BookOpen,
-  ChevronRight,
-  Sparkles,
-  ArrowRight,
-  CheckCircle,
-  AlertTriangle,
-  Gavel
-} from "lucide-react";
+import { Scale, MessageSquare, FileText, Shield, Users, BookOpen, ChevronRight, Sparkles, ArrowRight, CheckCircle, AlertTriangle, Gavel } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Layout } from "@/components/Layout";
 import { AshokaChakra } from "@/components/AshokaChakra";
 import { AgentNetwork } from "@/components/AgentNetwork";
-
-const features = [
-  {
-    icon: MessageSquare,
-    title: "AI Legal Chat",
-    description: "Get instant guidance on your legal issues with our multi-agent AI system trained on Indian law.",
-    link: "/chat",
-  },
-  {
-    icon: FileText,
-    title: "FIR & Document Drafting",
-    description: "Generate legally sound FIR drafts, complaints, and legal notices in proper format.",
-    link: "/chat",
-  },
-  {
-    icon: Shield,
-    title: "False Case Defense",
-    description: "Analyze accusations, identify weak claims, and understand your defense options.",
-    link: "/chat",
-  },
-  {
-    icon: Scale,
-    title: "Law Section Mapping",
-    description: "Automatic identification of applicable IPC, BNS, and CrPC sections for your case.",
-    link: "/chat",
-  },
-  {
-    icon: Users,
-    title: "Lawyer Connection",
-    description: "Connect with verified advocates when you need professional legal representation.",
-    link: "/lawyers",
-  },
-  {
-    icon: BookOpen,
-    title: "Legal Resources",
-    description: "Access comprehensive database of Indian laws, sections, and court judgments.",
-    link: "/resources",
-  },
-];
-
-const stats = [
-  { value: "500+", label: "IPC Sections Covered" },
-  { value: "358", label: "BNS Sections Mapped" },
-  { value: "24/7", label: "AI Availability" },
-  { value: "100%", label: "Privacy Protected" },
-];
-
-const legalCodes = [
-  { name: "Indian Penal Code (IPC)", sections: "500+ Sections", status: "Active" },
-  { name: "Bharatiya Nyaya Sanhita (BNS)", sections: "358 Sections", status: "New" },
-  { name: "Criminal Procedure Code", sections: "484 Sections", status: "Active" },
-  { name: "Indian Constitution", sections: "395 Articles", status: "Foundation" },
-];
-
+const features = [{
+  icon: MessageSquare,
+  title: "AI Legal Chat",
+  description: "Get instant guidance on your legal issues with our multi-agent AI system trained on Indian law.",
+  link: "/chat"
+}, {
+  icon: FileText,
+  title: "FIR & Document Drafting",
+  description: "Generate legally sound FIR drafts, complaints, and legal notices in proper format.",
+  link: "/chat"
+}, {
+  icon: Shield,
+  title: "False Case Defense",
+  description: "Analyze accusations, identify weak claims, and understand your defense options.",
+  link: "/chat"
+}, {
+  icon: Scale,
+  title: "Law Section Mapping",
+  description: "Automatic identification of applicable IPC, BNS, and CrPC sections for your case.",
+  link: "/chat"
+}, {
+  icon: Users,
+  title: "Lawyer Connection",
+  description: "Connect with verified advocates when you need professional legal representation.",
+  link: "/lawyers"
+}, {
+  icon: BookOpen,
+  title: "Legal Resources",
+  description: "Access comprehensive database of Indian laws, sections, and court judgments.",
+  link: "/resources"
+}];
+const stats = [{
+  value: "500+",
+  label: "IPC Sections Covered"
+}, {
+  value: "358",
+  label: "BNS Sections Mapped"
+}, {
+  value: "24/7",
+  label: "AI Availability"
+}, {
+  value: "100%",
+  label: "Privacy Protected"
+}];
+const legalCodes = [{
+  name: "Indian Penal Code (IPC)",
+  sections: "500+ Sections",
+  status: "Active"
+}, {
+  name: "Bharatiya Nyaya Sanhita (BNS)",
+  sections: "358 Sections",
+  status: "New"
+}, {
+  name: "Criminal Procedure Code",
+  sections: "484 Sections",
+  status: "Active"
+}, {
+  name: "Indian Constitution",
+  sections: "395 Articles",
+  status: "Foundation"
+}];
 const Index: React.FC = () => {
-  return (
-    <Layout>
+  return <Layout>
       {/* Hero Section */}
       <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden">
         {/* Background Elements */}
@@ -102,7 +95,7 @@ const Index: React.FC = () => {
             
             {/* Title */}
             <h1 className="font-serif text-4xl md:text-6xl lg:text-7xl font-bold mb-6 animate-fade-in-up">
-              <span className="text-gradient-gold">AI LeXa Lawyer</span>
+              <span className="text-gradient-gold">LeXa AI Lawyer</span>
               <br />
               <span className="text-foreground text-3xl md:text-4xl lg:text-5xl">
                 Smart Judiciary of India
@@ -162,18 +155,14 @@ const Index: React.FC = () => {
       <section className="py-16 bg-muted/30 border-y border-primary/20">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {stats.map((stat, index) => (
-              <div 
-                key={stat.label} 
-                className="text-center animate-fade-in-up"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
+            {stats.map((stat, index) => <div key={stat.label} className="text-center animate-fade-in-up" style={{
+            animationDelay: `${index * 100}ms`
+          }}>
                 <div className="text-3xl md:text-4xl font-bold text-gradient-gold font-serif mb-2">
                   {stat.value}
                 </div>
                 <div className="text-sm text-muted-foreground">{stat.label}</div>
-              </div>
-            ))}
+              </div>)}
           </div>
         </div>
       </section>
@@ -215,14 +204,11 @@ const Index: React.FC = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, index) => {
-              const Icon = feature.icon;
-              return (
-                <Link key={feature.title} to={feature.link}>
-                  <Card 
-                    variant="elevated" 
-                    className="h-full p-6 group cursor-pointer animate-fade-in-up"
-                    style={{ animationDelay: `${index * 100}ms` }}
-                  >
+            const Icon = feature.icon;
+            return <Link key={feature.title} to={feature.link}>
+                  <Card variant="elevated" className="h-full p-6 group cursor-pointer animate-fade-in-up" style={{
+                animationDelay: `${index * 100}ms`
+              }}>
                     <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-gold-light flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                       <Icon className="w-6 h-6 text-primary-foreground" />
                     </div>
@@ -237,9 +223,8 @@ const Index: React.FC = () => {
                       <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </Card>
-                </Link>
-              );
-            })}
+                </Link>;
+          })}
           </div>
         </div>
       </section>
@@ -259,8 +244,7 @@ const Index: React.FC = () => {
               </p>
               
               <div className="space-y-4">
-                {legalCodes.map((code) => (
-                  <Card key={code.name} variant="judicial" className="p-4">
+                {legalCodes.map(code => <Card key={code.name} variant="judicial" className="p-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <h4 className="font-medium">{code.name}</h4>
@@ -270,8 +254,7 @@ const Index: React.FC = () => {
                         {code.status}
                       </Badge>
                     </div>
-                  </Card>
-                ))}
+                  </Card>)}
               </div>
             </div>
             
@@ -362,8 +345,6 @@ const Index: React.FC = () => {
           </Card>
         </div>
       </section>
-    </Layout>
-  );
+    </Layout>;
 };
-
 export default Index;
