@@ -163,7 +163,10 @@ const CaseIntake: React.FC = () => {
       // Call the legal chat edge function for analysis
       const { data, error } = await supabase.functions.invoke('legal-chat', {
         body: {
-          message: `Analyze this legal case and identify applicable IPC, BNS, and CrPC sections:
+          messages: [
+            {
+              role: "user",
+              content: `Analyze this legal case and identify applicable IPC, BNS, and CrPC sections:
           
 Category: ${formData.caseCategory}
 Incident Description: ${formData.incidentDescription}
@@ -177,6 +180,8 @@ Please provide:
 3. Applicable CrPC sections
 4. Risk assessment
 5. Recommended next steps`
+            }
+          ]
         }
       });
 
