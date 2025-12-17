@@ -44,14 +44,26 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, conversationId } = await req.json();
+    const body = await req.json();
+    const { messages, conversationId, stream = false, message } = body;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    // Handle both 'message' (single string) and 'messages' (array) formats
+    let chatMessages = [];
+    if (messages && Array.isArray(messages)) {
+      chatMessages = messages;
+    } else if (message) {
+      chatMessages = [{ role: "user", content: message }];
+    } else {
+      throw new Error("No message or messages provided");
+    }
+
     console.log("Processing legal chat request for conversation:", conversationId);
+    console.log("Message count:", chatMessages.length);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -63,9 +75,9 @@ serve(async (req) => {
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: LEGAL_SYSTEM_PROMPT },
-          ...messages,
+          ...chatMessages,
         ],
-        stream: true,
+        stream: stream,
       }),
     });
 
@@ -92,9 +104,20 @@ serve(async (req) => {
       });
     }
 
-    return new Response(response.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-    });
+    // Return streaming response or JSON based on request
+    if (stream) {
+      return new Response(response.body, {
+        headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+      });
+    } else {
+      const data = await response.json();
+      const aiResponse = data.choices?.[0]?.message?.content || "Unable to process request";
+      console.log("AI response received, length:", aiResponse.length);
+      
+      return new Response(JSON.stringify({ response: aiResponse }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
   } catch (error) {
     console.error("Legal chat error:", error);
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
