@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Allowed origins for CORS - restrict to app domains
 const ALLOWED_ORIGINS = [
@@ -16,6 +17,29 @@ const getCorsHeaders = (origin: string | null) => {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   };
+};
+
+// Input validation and sanitization
+const MAX_TEXT_LENGTH = 5000;
+const MAX_FILENAME_LENGTH = 255;
+
+const sanitizeInput = (input: string, maxLength: number = MAX_TEXT_LENGTH): string => {
+  if (typeof input !== 'string') return '';
+  return input
+    .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+    .replace(/[<>]/g, '') // Remove HTML-like characters
+    .trim()
+    .slice(0, maxLength);
+};
+
+const sanitizeFileName = (fileName: string): string => {
+  if (typeof fileName !== 'string') return 'unknown';
+  // Remove path traversal attempts and sanitize
+  return fileName
+    .replace(/\.\./g, '')
+    .replace(/[\/\\:*?"<>|]/g, '')
+    .trim()
+    .slice(0, MAX_FILENAME_LENGTH) || 'unknown';
 };
 
 const ANALYSIS_PROMPT = `You are an AI Evidence Analysis Agent for the AI LeXa Lawyer platform. Your role is to analyze uploaded evidence files and provide legal insights.
@@ -47,14 +71,47 @@ serve(async (req) => {
   }
 
   try {
-    const { fileName, fileType, description, caseContext } = await req.json();
+    // Verify authentication
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      console.error("Missing authorization header");
+      return new Response(JSON.stringify({ error: "Authentication required" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Verify user with Supabase
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error("Auth error:", authError);
+      return new Response(JSON.stringify({ error: "Invalid authentication" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const body = await req.json();
+    
+    // Validate and sanitize inputs
+    const fileName = sanitizeFileName(body.fileName);
+    const fileType = sanitizeInput(body.fileType || 'unknown', 100);
+    const description = sanitizeInput(body.description || '');
+    const caseContext = sanitizeInput(body.caseContext || '');
+    
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log("Analyzing evidence:", fileName);
+    console.log("Analyzing evidence for user:", user.id, "file:", fileName);
 
     const userMessage = `Analyze the following evidence file:
 File Name: ${fileName}
@@ -96,7 +153,7 @@ Provide a comprehensive analysis of this evidence's potential legal relevance un
     });
   } catch (error) {
     console.error("Evidence analysis error:", error);
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
+    return new Response(JSON.stringify({ error: "An unexpected error occurred" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

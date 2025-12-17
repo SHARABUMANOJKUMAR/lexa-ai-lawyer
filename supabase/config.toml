@@ -1,10 +1,10 @@
 project_id = "ratlfzpryvunqzqmbuvk"
 
 [functions.legal-chat]
-verify_jwt = false
+# JWT verification enabled by default (secure)
 
 [functions.analyze-evidence]
-verify_jwt = false
+# JWT verification enabled by default (secure)
 
 [functions.generate-fir]
-verify_jwt = false
+# JWT verification enabled by default (secure)
