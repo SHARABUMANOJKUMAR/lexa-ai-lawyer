@@ -14,16 +14,347 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      cases: {
+        Row: {
+          accused_details: string | null
+          accused_name: string | null
+          ai_analysis: Json | null
+          assigned_lawyer_id: string | null
+          bns_sections: string[] | null
+          case_number: string | null
+          category: Database["public"]["Enums"]["case_category"]
+          created_at: string
+          crpc_sections: string[] | null
+          description: string
+          id: string
+          incident_date: string | null
+          incident_location: string | null
+          ipc_sections: string[] | null
+          status: Database["public"]["Enums"]["case_status"]
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          accused_details?: string | null
+          accused_name?: string | null
+          ai_analysis?: Json | null
+          assigned_lawyer_id?: string | null
+          bns_sections?: string[] | null
+          case_number?: string | null
+          category?: Database["public"]["Enums"]["case_category"]
+          created_at?: string
+          crpc_sections?: string[] | null
+          description: string
+          id?: string
+          incident_date?: string | null
+          incident_location?: string | null
+          ipc_sections?: string[] | null
+          status?: Database["public"]["Enums"]["case_status"]
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          accused_details?: string | null
+          accused_name?: string | null
+          ai_analysis?: Json | null
+          assigned_lawyer_id?: string | null
+          bns_sections?: string[] | null
+          case_number?: string | null
+          category?: Database["public"]["Enums"]["case_category"]
+          created_at?: string
+          crpc_sections?: string[] | null
+          description?: string
+          id?: string
+          incident_date?: string | null
+          incident_location?: string | null
+          ipc_sections?: string[] | null
+          status?: Database["public"]["Enums"]["case_status"]
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      chat_conversations: {
+        Row: {
+          case_id: string | null
+          created_at: string
+          id: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          case_id?: string | null
+          created_at?: string
+          id?: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          case_id?: string | null
+          created_at?: string
+          id?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_conversations_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_messages: {
+        Row: {
+          agent_name: string | null
+          content: string
+          conversation_id: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          agent_name?: string | null
+          content: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role: string
+          user_id: string
+        }
+        Update: {
+          agent_name?: string | null
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      evidence_files: {
+        Row: {
+          ai_analysis: Json | null
+          case_id: string
+          created_at: string
+          description: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          id: string
+          mime_type: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          case_id: string
+          created_at?: string
+          description?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_analysis?: Json | null
+          case_id?: string
+          created_at?: string
+          description?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          id?: string
+          mime_type?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evidence_files_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      legal_documents: {
+        Row: {
+          case_id: string
+          content: string | null
+          created_at: string
+          document_type: string
+          file_name: string | null
+          file_path: string | null
+          file_size: number | null
+          generated_by: string | null
+          id: string
+          mime_type: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          case_id: string
+          content?: string | null
+          created_at?: string
+          document_type: string
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          generated_by?: string | null
+          id?: string
+          mime_type?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          case_id?: string
+          content?: string | null
+          created_at?: string
+          document_type?: string
+          file_name?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          generated_by?: string | null
+          id?: string
+          mime_type?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_documents_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          address: string | null
+          avatar_url: string | null
+          city: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          phone: string | null
+          pincode: string | null
+          state: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          avatar_url?: string | null
+          city?: string | null
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          phone?: string | null
+          pincode?: string | null
+          state?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          avatar_url?: string | null
+          city?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          phone?: string | null
+          pincode?: string | null
+          state?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "citizen" | "lawyer" | "admin"
+      case_category:
+        | "criminal"
+        | "civil"
+        | "family"
+        | "property"
+        | "consumer"
+        | "cyber"
+        | "labor"
+        | "constitutional"
+        | "other"
+      case_status:
+        | "draft"
+        | "submitted"
+        | "under_review"
+        | "assigned"
+        | "in_progress"
+        | "resolved"
+        | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +481,28 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["citizen", "lawyer", "admin"],
+      case_category: [
+        "criminal",
+        "civil",
+        "family",
+        "property",
+        "consumer",
+        "cyber",
+        "labor",
+        "constitutional",
+        "other",
+      ],
+      case_status: [
+        "draft",
+        "submitted",
+        "under_review",
+        "assigned",
+        "in_progress",
+        "resolved",
+        "closed",
+      ],
+    },
   },
 } as const

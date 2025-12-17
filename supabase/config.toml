@@ -1,1 +1,10 @@
 project_id = "ratlfzpryvunqzqmbuvk"
+
+[functions.legal-chat]
+verify_jwt = false
+
+[functions.analyze-evidence]
+verify_jwt = false
+
+[functions.generate-fir]
+verify_jwt = false

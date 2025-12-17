@@ -1,33 +1,40 @@
-import React from "react";
-import { Link, useLocation } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { 
   Scale, 
   MessageSquare, 
   FileText, 
   LayoutDashboard, 
   Users, 
-  Shield, 
-  Settings,
+  Shield,
   Menu,
   X,
-  ChevronRight
+  User,
+  LogOut
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AshokaChakra } from "@/components/AshokaChakra";
-import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 const navItems = [
   { path: "/", label: "Home", icon: Scale },
   { path: "/chat", label: "AI Legal Chat", icon: MessageSquare },
   { path: "/case-intake", label: "New Case", icon: FileText },
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { path: "/lawyer-portal", label: "Lawyer Portal", icon: Users },
-  { path: "/admin", label: "Admin", icon: Shield },
 ];
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("Signed out successfully");
+    navigate("/");
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 glass border-b border-primary/20">
