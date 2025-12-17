@@ -10,7 +10,8 @@ import {
   Menu,
   X,
   User,
-  LogOut
+  LogOut,
+  ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AshokaChakra } from "@/components/AshokaChakra";
