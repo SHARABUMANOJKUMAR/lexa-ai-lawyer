@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Allowed origins for CORS - restrict to app domains
 const ALLOWED_ORIGINS = [
@@ -16,6 +17,48 @@ const getCorsHeaders = (origin: string | null) => {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   };
+};
+
+// Input validation and sanitization
+const MAX_MESSAGE_LENGTH = 10000;
+const MAX_MESSAGES = 50;
+
+const sanitizeInput = (input: string): string => {
+  if (typeof input !== 'string') return '';
+  return input
+    .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+    .trim()
+    .slice(0, MAX_MESSAGE_LENGTH);
+};
+
+const validateMessages = (messages: any[]): { valid: boolean; error?: string; sanitized?: any[] } => {
+  if (!Array.isArray(messages)) {
+    return { valid: false, error: "Messages must be an array" };
+  }
+  if (messages.length === 0) {
+    return { valid: false, error: "At least one message is required" };
+  }
+  if (messages.length > MAX_MESSAGES) {
+    return { valid: false, error: `Maximum ${MAX_MESSAGES} messages allowed` };
+  }
+
+  const sanitized = [];
+  for (const msg of messages) {
+    if (!msg || typeof msg !== 'object') {
+      return { valid: false, error: "Invalid message format" };
+    }
+    const role = msg.role;
+    if (!['user', 'assistant', 'system'].includes(role)) {
+      return { valid: false, error: "Invalid message role" };
+    }
+    const content = sanitizeInput(msg.content || '');
+    if (content.length === 0) {
+      return { valid: false, error: "Message content cannot be empty" };
+    }
+    sanitized.push({ role, content });
+  }
+
+  return { valid: true, sanitized };
 };
 
 const LEGAL_SYSTEM_PROMPT = `You are AI LeXa Lawyer, an advanced AI-powered legal guidance assistant for the Smart Judiciary of India platform. You operate as a multi-agent system with specialized capabilities.
@@ -106,6 +149,32 @@ serve(async (req) => {
   }
 
   try {
+    // Verify authentication
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      console.error("Missing authorization header");
+      return new Response(JSON.stringify({ error: "Authentication required" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Verify user with Supabase
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error("Auth error:", authError);
+      return new Response(JSON.stringify({ error: "Invalid authentication" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const body = await req.json();
     const { messages, conversationId, stream = false, message } = body;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -115,17 +184,34 @@ serve(async (req) => {
       throw new Error("AI service is not configured. Please contact support.");
     }
 
-    // Handle both 'message' (single string) and 'messages' (array) formats
+    // Validate and sanitize input
     let chatMessages = [];
     if (messages && Array.isArray(messages)) {
-      chatMessages = messages;
+      const validation = validateMessages(messages);
+      if (!validation.valid) {
+        return new Response(JSON.stringify({ error: validation.error }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      chatMessages = validation.sanitized!;
     } else if (message) {
-      chatMessages = [{ role: "user", content: message }];
+      const sanitizedMessage = sanitizeInput(message);
+      if (sanitizedMessage.length === 0) {
+        return new Response(JSON.stringify({ error: "Message cannot be empty" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      chatMessages = [{ role: "user", content: sanitizedMessage }];
     } else {
-      throw new Error("No message or messages provided");
+      return new Response(JSON.stringify({ error: "No message or messages provided" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    console.log("Processing legal chat request for conversation:", conversationId);
+    console.log("Processing legal chat request for user:", user.id, "conversation:", conversationId);
     console.log("Message count:", chatMessages.length);
     console.log("Stream mode:", stream);
 
@@ -196,7 +282,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Legal chat error:", error);
     return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : "An unexpected error occurred. Please try again.",
+      error: "An unexpected error occurred. Please try again.",
       retry: true 
     }), {
       status: 500,

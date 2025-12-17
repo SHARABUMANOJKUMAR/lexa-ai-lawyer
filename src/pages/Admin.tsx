@@ -60,7 +60,9 @@ interface CaseOverview {
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingRole, setCheckingRole] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -78,9 +80,49 @@ const Admin: React.FC = () => {
     successRate: 89
   });
 
+  // Check admin role on mount
   useEffect(() => {
-    fetchData();
-  }, []);
+    const checkAdminRole = async () => {
+      if (authLoading) return;
+      
+      if (!user) {
+        toast.error('Please log in to access the admin portal');
+        navigate('/auth');
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .single();
+
+        if (error || !data) {
+          toast.error('Access denied: Admin privileges required');
+          navigate('/');
+          return;
+        }
+
+        setIsAdmin(true);
+      } catch (error) {
+        console.error('Error checking admin role:', error);
+        toast.error('Unable to verify admin access');
+        navigate('/');
+      } finally {
+        setCheckingRole(false);
+      }
+    };
+
+    checkAdminRole();
+  }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchData();
+    }
+  }, [isAdmin]);
 
   const fetchData = async () => {
     await Promise.all([fetchUsers(), fetchCases(), fetchStats()]);
@@ -198,6 +240,25 @@ const Admin: React.FC = () => {
     { time: "09:15 AM", type: "warning", message: "AI attempted legal verdict - blocked and logged", agent: "Ethics & Compliance Agent" },
     { time: "08:45 AM", type: "info", message: "Human-in-the-loop verification completed", agent: "Admin Oversight Agent" },
   ];
+
+  // Show loading state while checking authentication and role
+  if (authLoading || checkingRole) {
+    return (
+      <Layout>
+        <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-muted-foreground">Verifying admin access...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Don't render if not admin (will have already navigated away)
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <Layout>

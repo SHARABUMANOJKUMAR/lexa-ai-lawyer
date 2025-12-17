@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // Allowed origins for CORS - restrict to app domains
 const ALLOWED_ORIGINS = [
@@ -16,6 +17,28 @@ const getCorsHeaders = (origin: string | null) => {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   };
+};
+
+// Input validation and sanitization
+const MAX_TEXT_LENGTH = 5000;
+const MAX_NAME_LENGTH = 200;
+const MAX_ADDRESS_LENGTH = 500;
+
+const sanitizeInput = (input: any, maxLength: number = MAX_TEXT_LENGTH): string => {
+  if (typeof input !== 'string') return '';
+  return input
+    .replace(/[\x00-\x1F\x7F]/g, '') // Remove control characters
+    .replace(/[<>]/g, '') // Remove HTML-like characters
+    .trim()
+    .slice(0, maxLength);
+};
+
+const sanitizeName = (name: any): string => {
+  return sanitizeInput(name, MAX_NAME_LENGTH) || "Not provided";
+};
+
+const sanitizeAddress = (address: any): string => {
+  return sanitizeInput(address, MAX_ADDRESS_LENGTH) || "Not provided";
 };
 
 const FIR_GENERATION_PROMPT = `You are the FIR & Legal Drafting Agent for AI LeXa Lawyer - Smart Judiciary of India. Generate a formal First Information Report (FIR) draft in proper Indian legal format.
@@ -61,25 +84,57 @@ serve(async (req) => {
   }
 
   try {
+    // Verify authentication
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      console.error("Missing authorization header");
+      return new Response(JSON.stringify({ error: "Authentication required" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Verify user with Supabase
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      console.error("Auth error:", authError);
+      return new Response(JSON.stringify({ error: "Invalid authentication" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const body = await req.json();
     
-    // Support both old and new field naming conventions
-    const complainantName = body.complainantName || body.fullName || "Not provided";
-    const fatherName = body.fatherName || "";
-    const complainantAddress = body.complainantAddress || body.address || "Not provided";
-    const complainantPhone = body.complainantPhone || body.phone || "Not provided";
-    const incidentDate = body.incidentDate || "Not specified";
-    const incidentTime = body.incidentTime || "Not specified";
-    const incidentLocation = body.incidentLocation || "Not specified";
-    const incidentDescription = body.incidentDescription || "Not provided";
-    const accusedName = body.accusedName || "Unknown";
-    const accusedAddress = body.accusedAddress || "Unknown";
-    const accusedDetails = body.accusedDetails || body.accusedDescription || "Not available";
-    const caseCategory = body.caseCategory || body.category || "Other";
-    const witnessName = body.witnessName || "None";
-    const witnessContact = body.witnessContact || "N/A";
-    const ipcSections = body.ipcSections || [];
-    const bnsSections = body.bnsSections || [];
+    // Validate and sanitize all inputs
+    const complainantName = sanitizeName(body.complainantName || body.fullName);
+    const fatherName = sanitizeName(body.fatherName);
+    const complainantAddress = sanitizeAddress(body.complainantAddress || body.address);
+    const complainantPhone = sanitizeInput(body.complainantPhone || body.phone, 20) || "Not provided";
+    const incidentDate = sanitizeInput(body.incidentDate, 50) || "Not specified";
+    const incidentTime = sanitizeInput(body.incidentTime, 50) || "Not specified";
+    const incidentLocation = sanitizeAddress(body.incidentLocation) || "Not specified";
+    const incidentDescription = sanitizeInput(body.incidentDescription);
+    const accusedName = sanitizeName(body.accusedName) || "Unknown";
+    const accusedAddress = sanitizeAddress(body.accusedAddress) || "Unknown";
+    const accusedDetails = sanitizeInput(body.accusedDetails || body.accusedDescription) || "Not available";
+    const caseCategory = sanitizeInput(body.caseCategory || body.category, 100) || "Other";
+    const witnessName = sanitizeName(body.witnessName) || "None";
+    const witnessContact = sanitizeInput(body.witnessContact, 50) || "N/A";
+    
+    // Validate arrays
+    const ipcSections = Array.isArray(body.ipcSections) 
+      ? body.ipcSections.slice(0, 20).map((s: any) => sanitizeInput(String(s), 50))
+      : [];
+    const bnsSections = Array.isArray(body.bnsSections) 
+      ? body.bnsSections.slice(0, 20).map((s: any) => sanitizeInput(String(s), 50))
+      : [];
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
@@ -88,7 +143,7 @@ serve(async (req) => {
       throw new Error("FIR generation service not properly configured");
     }
 
-    console.log("🔍 FIR Drafting Agent: Generating FIR draft for:", complainantName);
+    console.log("FIR Drafting Agent: Generating FIR draft for user:", user.id);
 
     const currentDate = new Date().toLocaleDateString('en-IN', {
       day: '2-digit',
@@ -116,7 +171,7 @@ serve(async (req) => {
 - Type/Category: ${caseCategory}
 
 **Detailed Description:**
-${incidentDescription}
+${incidentDescription || "Not provided"}
 
 **Accused Person Details:**
 - Name: ${accusedName}
@@ -153,7 +208,7 @@ The document should be suitable for submission to an Indian police station.`;
           { role: "system", content: FIR_GENERATION_PROMPT },
           { role: "user", content: userMessage },
         ],
-        temperature: 0.3, // Lower temperature for consistent legal formatting
+        temperature: 0.3,
       }),
     });
 
@@ -185,7 +240,7 @@ The document should be suitable for submission to an Indian police station.`;
       throw new Error("Empty response from AI service");
     }
 
-    console.log("✅ FIR Drafting Agent: FIR generated successfully");
+    console.log("FIR Drafting Agent: FIR generated successfully");
 
     return new Response(JSON.stringify({ 
       fir: firContent,
@@ -197,7 +252,7 @@ The document should be suitable for submission to an Indian police station.`;
   } catch (error) {
     console.error("FIR generation error:", error);
     return new Response(JSON.stringify({ 
-      error: error instanceof Error ? error.message : "FIR generation failed",
+      error: "An unexpected error occurred. Please try again.",
       status: "error"
     }), {
       status: 500,
@@ -241,7 +296,7 @@ Nature of Offence: ${data.caseCategory}
                     BRIEF FACTS OF THE CASE
 ═══════════════════════════════════════════════════════════════
 
-${data.incidentDescription}
+${data.incidentDescription || 'Details not provided'}
 
 ═══════════════════════════════════════════════════════════════
                     ACCUSED DETAILS
