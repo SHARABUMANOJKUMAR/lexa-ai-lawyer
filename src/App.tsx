@@ -12,6 +12,8 @@ import Auth from "./pages/Auth";
 import LawyerPortal from "./pages/LawyerPortal";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import Lawyers from "./pages/Lawyers";
+import Resources from "./pages/Resources";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +32,8 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/lawyer-portal" element={<LawyerPortal />} />
             <Route path="/lawyer" element={<LawyerPortal />} />
+            <Route path="/lawyers" element={<Lawyers />} />
+            <Route path="/resources" element={<Resources />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
