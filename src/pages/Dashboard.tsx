@@ -31,6 +31,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import FilePreviewModal from "@/components/FilePreviewModal";
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
