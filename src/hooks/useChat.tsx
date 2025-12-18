@@ -19,7 +19,7 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
 
 export const useChat = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -141,9 +141,8 @@ export const useChat = () => {
 
     while (retryCount < MAX_RETRIES && !success) {
       try {
-        // Get the user's access token
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) {
+        const accessToken = session?.access_token;
+        if (!accessToken) {
           throw new Error('Please sign in to continue');
         }
 
@@ -158,7 +157,7 @@ export const useChat = () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({ 
             messages: apiMessages,
