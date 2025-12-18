@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
+import DOMPurify from "dompurify";
 import { 
   Send, 
   Mic, 
@@ -30,6 +31,14 @@ import { useChat, ChatMessage } from "@/hooks/useChat";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+
+// Sanitize HTML to prevent XSS attacks
+const sanitizeHtml = (html: string): string => {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['strong', 'em', 'b', 'i', 'span', 'p', 'br'],
+    ALLOWED_ATTR: ['class'],
+  });
+};
 
 interface UploadedFile {
   id: string;
@@ -376,7 +385,7 @@ export const LegalChatInterface: React.FC = () => {
             return (
               <div key={i} className="flex items-start gap-2 my-1 pl-2">
                 <span className="text-primary font-medium min-w-[20px]">{line.match(/^\d+/)?.[0]}.</span>
-                <span dangerouslySetInnerHTML={{ __html: text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary">$1</strong>') }} />
+                <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary">$1</strong>')) }} />
               </div>
             );
           }
@@ -386,13 +395,13 @@ export const LegalChatInterface: React.FC = () => {
             return (
               <div key={i} className="flex items-start gap-2 my-1 pl-4">
                 <span className="text-primary mt-1.5 w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                <span dangerouslySetInnerHTML={{ __html: text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary">$1</strong>') }} />
+                <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary">$1</strong>')) }} />
               </div>
             );
           }
           // Bold text
           if (line.includes('**')) {
-            return <p key={i} className="my-1" dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary">$1</strong>') }} />;
+            return <p key={i} className="my-1" dangerouslySetInnerHTML={{ __html: sanitizeHtml(line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-primary">$1</strong>')) }} />;
           }
           // Empty lines
           if (!line.trim()) {
@@ -425,11 +434,11 @@ export const LegalChatInterface: React.FC = () => {
                     return (
                       <div key={i} className="flex items-start gap-2 my-1">
                         <span className="text-primary">•</span>
-                        <span dangerouslySetInnerHTML={{ __html: line.replace(/^[-•]\s*/, '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                        <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(line.replace(/^[-•]\s*/, '').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')) }} />
                       </div>
                     );
                   }
-                  return <p key={i} className="my-1" dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />;
+                  return <p key={i} className="my-1" dangerouslySetInnerHTML={{ __html: sanitizeHtml(line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')) }} />;
                 })}
               </div>
             )}
