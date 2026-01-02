@@ -14,6 +14,42 @@ const getCorsHeaders = (origin: string | null) => {
   };
 };
 
+// Rate limiting configuration
+const RATE_LIMIT = {
+  maxRequests: 10,
+  windowMs: 60000, // 1 minute
+};
+
+// In-memory rate limit store
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+const checkRateLimit = (userId: string): { allowed: boolean; retryAfter?: number } => {
+  const now = Date.now();
+  const userLimit = rateLimitStore.get(userId);
+  
+  // Clean old entries periodically
+  if (rateLimitStore.size > 1000) {
+    for (const [key, value] of rateLimitStore.entries()) {
+      if (now > value.resetTime) {
+        rateLimitStore.delete(key);
+      }
+    }
+  }
+  
+  if (!userLimit || now > userLimit.resetTime) {
+    rateLimitStore.set(userId, { count: 1, resetTime: now + RATE_LIMIT.windowMs });
+    return { allowed: true };
+  }
+  
+  if (userLimit.count >= RATE_LIMIT.maxRequests) {
+    const retryAfter = Math.ceil((userLimit.resetTime - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+  
+  userLimit.count++;
+  return { allowed: true };
+};
+
 // Input validation and sanitization
 const MAX_TEXT_LENGTH = 5000;
 const MAX_FILENAME_LENGTH = 255;
@@ -89,6 +125,23 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Invalid authentication" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Check rate limit
+    const rateLimitResult = checkRateLimit(user.id);
+    if (!rateLimitResult.allowed) {
+      console.warn("Rate limit exceeded for user:", user.id);
+      return new Response(JSON.stringify({ 
+        error: "Rate limit exceeded. Please wait before making another request.",
+        retryAfter: rateLimitResult.retryAfter
+      }), {
+        status: 429,
+        headers: { 
+          ...corsHeaders, 
+          "Content-Type": "application/json",
+          "Retry-After": String(rateLimitResult.retryAfter)
+        },
       });
     }
 

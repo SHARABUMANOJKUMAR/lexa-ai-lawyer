@@ -19,16 +19,36 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { z } from "zod";
 
+// Common passwords to block
+const COMMON_PASSWORDS = [
+  'password', '123456', '12345678', 'qwerty', 'abc123',
+  'monkey', '1234567', 'letmein', 'trustno1', 'dragon',
+  'baseball', 'iloveyou', 'master', 'sunshine', 'ashley',
+  'password1', 'password123', '123456789', '12345', '1234567890'
+];
+
+// Strong password schema with security requirements
+const passwordSchema = z.string()
+  .min(8, "Password must be at least 8 characters")
+  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+  .regex(/[0-9]/, "Password must contain at least one number")
+  .regex(/[^A-Za-z0-9]/, "Password must contain at least one special character (!@#$%^&*)")
+  .refine(
+    (password) => !COMMON_PASSWORDS.includes(password.toLowerCase()),
+    "This password is too common. Please choose a stronger password"
+  );
+
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z.string().min(1, "Password is required"),
 });
 
 const registerSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
   phone: z.string().optional(),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: passwordSchema,
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
