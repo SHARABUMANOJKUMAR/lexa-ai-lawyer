@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Scale, Mail, Phone, MapPin, ExternalLink } from "lucide-react";
-import { JusticeScales } from "@/components/JusticeScales";
+import { AshokaChakra } from "@/components/AshokaChakra";
 
 // Custom social icons to match the design
 const TwitterIcon = () => <svg viewBox="0 0 24 24" className="w-5 h-5" fill="currentColor">
@@ -20,7 +20,7 @@ export const Footer: React.FC = () => {
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <JusticeScales size={36} className="text-primary" animate={false} />
+              <AshokaChakra size={36} className="text-primary" animate={false} />
               <div>
                 <h3 className="font-serif font-bold text-gradient-gold">LeXa AI Lawyer</h3>
                 <p className="text-xs text-muted-foreground">Smart Judiciary of India</p>

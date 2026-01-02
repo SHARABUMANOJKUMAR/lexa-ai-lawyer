@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Scale, MessageSquare, FileText, LayoutDashboard, Users, Shield, Menu, X, User, LogOut, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { JusticeScales } from "@/components/JusticeScales";
+import { AshokaChakra } from "@/components/AshokaChakra";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 const navItems = [{
@@ -46,7 +46,7 @@ export const Navbar: React.FC = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
             <div className="relative">
-              <JusticeScales size={40} className="text-primary" animate={false} />
+              <AshokaChakra size={40} className="text-primary" animate={false} />
               <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
             <div className="hidden sm:block">
