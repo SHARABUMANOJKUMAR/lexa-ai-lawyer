@@ -8,3 +8,6 @@ project_id = "ratlfzpryvunqzqmbuvk"
 
 [functions.generate-fir]
 # JWT verification enabled by default (secure)
+
+[functions.sync-to-sheets]
+verify_jwt = true
