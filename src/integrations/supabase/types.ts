@@ -200,6 +200,53 @@ export type Database = {
           },
         ]
       }
+      failed_syncs: {
+        Row: {
+          case_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          last_retry_at: string | null
+          max_retries: number | null
+          next_retry_at: string | null
+          payload: Json
+          retry_count: number | null
+          status: string | null
+        }
+        Insert: {
+          case_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_retry_at?: string | null
+          max_retries?: number | null
+          next_retry_at?: string | null
+          payload: Json
+          retry_count?: number | null
+          status?: string | null
+        }
+        Update: {
+          case_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_retry_at?: string | null
+          max_retries?: number | null
+          next_retry_at?: string | null
+          payload?: Json
+          retry_count?: number | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "failed_syncs_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "cases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       legal_documents: {
         Row: {
           case_id: string
