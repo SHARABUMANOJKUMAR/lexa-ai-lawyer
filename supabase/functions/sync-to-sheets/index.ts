@@ -1,4 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// Declare EdgeRuntime for Supabase background tasks
+declare const EdgeRuntime: {
+  waitUntil: (promise: Promise<any>) => void;
+};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,6 +48,153 @@ function sanitizeInput(input: any, maxLength: number = 1000): string {
   return str.substring(0, maxLength);
 }
 
+// Create Supabase client for database operations
+function getSupabaseClient() {
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  return createClient(supabaseUrl, supabaseKey);
+}
+
+// Sync data to Google Sheets with retry logic
+async function syncToGoogleSheets(sheetsData: CaseData): Promise<{ success: boolean; error?: string }> {
+  try {
+    console.log("[sync-to-sheets] Sending data to Google Sheets:", {
+      case_id: sheetsData.case_id,
+      case_number: sheetsData.case_number,
+      full_name: sheetsData.full_name
+    });
+
+    const response = await fetch(GOOGLE_SHEETS_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(sheetsData),
+    });
+
+    console.log("[sync-to-sheets] Google Sheets response status:", response.status);
+
+    // Try to read response body if available
+    let responseText = '';
+    try {
+      responseText = await response.text();
+      console.log("[sync-to-sheets] Google Sheets response:", responseText);
+    } catch (e) {
+      console.log("[sync-to-sheets] Could not read response body (expected for no-cors)");
+    }
+
+    // Consider 200-399 as success (Google Apps Script may redirect)
+    if (response.status >= 200 && response.status < 400) {
+      return { success: true };
+    }
+
+    return { success: false, error: `HTTP ${response.status}: ${responseText}` };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error("[sync-to-sheets] Sync error:", errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+// Log failed sync for retry
+async function logFailedSync(supabase: any, caseId: string, payload: CaseData, errorMessage: string) {
+  try {
+    await supabase.from('failed_syncs').insert({
+      case_id: caseId,
+      payload: payload,
+      error_message: errorMessage,
+      status: 'pending',
+      retry_count: 0,
+      next_retry_at: new Date(Date.now() + 5 * 60 * 1000).toISOString() // 5 minutes from now
+    });
+    console.log("[sync-to-sheets] Failed sync logged for retry");
+  } catch (err) {
+    console.error("[sync-to-sheets] Failed to log sync for retry:", err);
+  }
+}
+
+// Mark sync as successful
+async function markSyncSuccess(supabase: any, syncId: string) {
+  try {
+    await supabase.from('failed_syncs').update({
+      status: 'success',
+      last_retry_at: new Date().toISOString()
+    }).eq('id', syncId);
+  } catch (err) {
+    console.error("[sync-to-sheets] Failed to mark sync as success:", err);
+  }
+}
+
+// Mark sync as failed after max retries
+async function markSyncFailed(supabase: any, syncId: string) {
+  try {
+    await supabase.from('failed_syncs').update({
+      status: 'failed',
+      last_retry_at: new Date().toISOString()
+    }).eq('id', syncId);
+  } catch (err) {
+    console.error("[sync-to-sheets] Failed to mark sync as failed:", err);
+  }
+}
+
+// Process pending retries (background task)
+async function processRetries() {
+  const supabase = getSupabaseClient();
+  
+  console.log("[sync-to-sheets] Processing pending retries...");
+  
+  const { data: pendingSyncs, error } = await supabase
+    .from('failed_syncs')
+    .select('*')
+    .in('status', ['pending', 'retrying'])
+    .lt('next_retry_at', new Date().toISOString())
+    .lt('retry_count', 3)
+    .limit(10);
+
+  if (error) {
+    console.error("[sync-to-sheets] Error fetching pending syncs:", error);
+    return;
+  }
+
+  if (!pendingSyncs || pendingSyncs.length === 0) {
+    console.log("[sync-to-sheets] No pending retries found");
+    return;
+  }
+
+  console.log(`[sync-to-sheets] Found ${pendingSyncs.length} pending retries`);
+
+  for (const sync of pendingSyncs) {
+    // Update status to retrying
+    await supabase.from('failed_syncs').update({
+      status: 'retrying',
+      retry_count: sync.retry_count + 1,
+      last_retry_at: new Date().toISOString()
+    }).eq('id', sync.id);
+
+    const result = await syncToGoogleSheets(sync.payload as CaseData);
+    
+    if (result.success) {
+      await markSyncSuccess(supabase, sync.id);
+      console.log(`[sync-to-sheets] Retry successful for sync ${sync.id}`);
+    } else {
+      const newRetryCount = sync.retry_count + 1;
+      if (newRetryCount >= 3) {
+        await markSyncFailed(supabase, sync.id);
+        console.log(`[sync-to-sheets] Max retries reached for sync ${sync.id}`);
+      } else {
+        // Schedule next retry with exponential backoff (5min, 15min, 45min)
+        const backoffMinutes = 5 * Math.pow(3, newRetryCount);
+        await supabase.from('failed_syncs').update({
+          status: 'pending',
+          error_message: result.error,
+          next_retry_at: new Date(Date.now() + backoffMinutes * 60 * 1000).toISOString()
+        }).eq('id', sync.id);
+        console.log(`[sync-to-sheets] Retry ${newRetryCount} failed, next retry in ${backoffMinutes} minutes`);
+      }
+    }
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -51,9 +204,19 @@ serve(async (req) => {
   try {
     const body = await req.json();
     
-    console.log("[sync-to-sheets] Received request to sync case data");
+    console.log("[sync-to-sheets] Received request");
 
-    // Validate required fields
+    // Check if this is a retry processing request
+    if (body.action === 'process_retries') {
+      // Use background task for retry processing
+      EdgeRuntime.waitUntil(processRetries());
+      return new Response(
+        JSON.stringify({ success: true, message: "Retry processing started" }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate required fields for normal sync
     if (!body.case_id) {
       console.error("[sync-to-sheets] Missing case_id");
       return new Response(
@@ -89,40 +252,22 @@ serve(async (req) => {
       evidence_count: typeof body.evidence_count === 'number' ? body.evidence_count : 0,
     };
 
-    console.log("[sync-to-sheets] Sending data to Google Sheets:", {
-      case_id: sheetsData.case_id,
-      case_number: sheetsData.case_number,
-      full_name: sheetsData.full_name
-    });
+    // Attempt sync to Google Sheets
+    const result = await syncToGoogleSheets(sheetsData);
 
-    // Send to Google Sheets using no-cors mode equivalent (just fire and continue)
-    // Note: Google Apps Script Web Apps require specific handling
-    const response = await fetch(GOOGLE_SHEETS_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(sheetsData),
-    });
-
-    // Google Apps Script may return redirect or opaque response
-    // We consider it successful if no network error occurred
-    console.log("[sync-to-sheets] Google Sheets response status:", response.status);
-
-    // Try to read response body if available
-    let responseText = '';
-    try {
-      responseText = await response.text();
-      console.log("[sync-to-sheets] Google Sheets response:", responseText);
-    } catch (e) {
-      console.log("[sync-to-sheets] Could not read response body (expected for no-cors)");
+    if (!result.success) {
+      // Log for retry in background (non-blocking)
+      const supabase = getSupabaseClient();
+      EdgeRuntime.waitUntil(logFailedSync(supabase, sheetsData.case_id, sheetsData, result.error || 'Unknown error'));
     }
 
+    // Always return success to not block user flow
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "Case data synced to Google Sheets",
-        case_id: sheetsData.case_id 
+        message: result.success ? "Case data synced to Google Sheets" : "Case data queued for sync",
+        case_id: sheetsData.case_id,
+        sync_status: result.success ? 'synced' : 'queued'
       }),
       { 
         status: 200, 
@@ -132,10 +277,9 @@ serve(async (req) => {
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error("[sync-to-sheets] Error syncing to Google Sheets:", errorMessage);
+    console.error("[sync-to-sheets] Error:", errorMessage);
     
     // Return success anyway - we don't want to block the user flow
-    // The error is logged for retry/monitoring purposes
     return new Response(
       JSON.stringify({ 
         success: false, 
@@ -143,7 +287,7 @@ serve(async (req) => {
         logged: true 
       }),
       { 
-        status: 200, // Return 200 even on failure to not block the flow
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
