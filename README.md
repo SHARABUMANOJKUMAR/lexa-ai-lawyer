@@ -1,73 +1,135 @@
-# Welcome to your Lovable project
+# ⚖️ AI LeXa Lawyer – Smart Judiciary of India
 
-## Project info
+> **“Don’t Fear the Law. Understand It. Use It. Protect Yourself.”**
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+---
 
-## How can I edit this code?
+## 🌍 The Story Behind AI LeXa Lawyer
 
-There are several ways of editing your application.
+Imagine a farmer in a small village.
+A student facing cyberbullying.
+A woman suffering domestic abuse.
+A senior citizen worried about property fraud.
 
-**Use Lovable**
+All of them have one thing in common:
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+They need justice.
 
-Changes made via Lovable will be committed automatically to this repo.
+But justice often feels:
+- Expensive 💸
+- Complicated 📚
+- Time-consuming ⏳
+- Intimidating 😨
 
-**Use your preferred IDE**
+Most people do not know:
+- Which law applies to their problem
+- How to file an FIR
+- What evidence to collect
+- What steps to take next
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+Because of this, many people stay silent.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+**AI LeXa Lawyer was created to change that.**
 
-Follow these steps:
+---
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# 💡 What is AI LeXa Lawyer?
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+AI LeXa Lawyer is an AI-powered legal assistance platform designed to make legal help as simple and accessible as chatting with a friend.
 
-# Step 3: Install the necessary dependencies.
-npm i
+It helps users:
+- 🧠 Understand laws in simple language
+- 📄 Generate FIR drafts automatically
+- ⚖️ Analyze legal issues using AI
+- 📂 Upload and organize evidence
+- 📈 Track case progress
+- 📧 Receive automated FIR PDFs by email
+- 🌐 Access legal guidance in multiple languages
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+---
 
-**Edit a file directly in GitHub**
+# 🎯 Our Mission
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+> **To make justice as accessible as water — available to every human, regardless of income, education, or location.**
 
-**Use GitHub Codespaces**
+---
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# 🚀 Core Features
 
-## What technologies are used for this project?
+## 🤖 AI Legal Chat
+Ask legal questions in natural language and receive clear, structured answers.
 
-This project is built with:
+## 📄 Automated FIR Generator
+Generate professional FIR drafts in minutes.
 
-- Vite
-- TypeScript
+## 🧠 Multi-Agent Legal Analysis
+Specialized AI agents collaborate to:
+- Identify applicable laws
+- Evaluate risks
+- Suggest next steps
+- Draft documents
+
+## 📂 Evidence Upload & Management
+Upload images, PDFs, videos, and documents.
+
+## 📊 Case Dashboard
+Track case status from filing to resolution.
+
+## 📧 Automated Email Notifications
+Receive FIR PDFs and case updates automatically.
+
+## 📄 Google Docs & PDF Automation
+Create professional legal documents instantly.
+
+## 👨‍💼 Admin Portal
+Manage users, monitor cases, and view analytics.
+
+---
+
+# 🏗️ Technology Stack
+
+### Frontend
 - React
-- shadcn-ui
+- TypeScript
 - Tailwind CSS
 
-## How can I deploy this project?
+### Backend
+- Supabase
+- Edge Functions
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+### AI
+- OpenAI API
+- Multi-Agent Workflows
 
-## Can I connect a custom domain to my Lovable project?
+### Automation
+- Google Sheets
+- Google Docs
+- AutoCrat
+- Google Apps Script
 
-Yes, you can!
+### Deployment
+- Lovable
+- Netlify
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+# 🔄 How It Works
+
+```text
+User Describes Problem
+        ↓
+AI Understands Context
+        ↓
+Relevant Laws Identified
+        ↓
+FIR / Legal Documents Generated
+        ↓
+Evidence Organized
+        ↓
+Case Stored in Supabase
+        ↓
+Google Sheets Sync
+        ↓
+PDF Generated
+        ↓
+Email Sent to User
