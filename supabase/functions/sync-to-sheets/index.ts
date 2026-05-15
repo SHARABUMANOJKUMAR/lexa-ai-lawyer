@@ -202,12 +202,45 @@ serve(async (req) => {
   }
 
   try {
+    // Require authenticated user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: userData, error: userErr } = await userClient.auth.getUser();
+    if (userErr || !userData?.user) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    const callerId = userData.user.id;
+
     const body = await req.json();
     
     console.log("[sync-to-sheets] Received request");
 
     // Check if this is a retry processing request
     if (body.action === 'process_retries') {
+      // Admin-only
+      const { data: isAdmin } = await userClient.rpc('has_role', {
+        _user_id: callerId,
+        _role: 'admin',
+      });
+      if (!isAdmin) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Forbidden' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       // Use background task for retry processing
       EdgeRuntime.waitUntil(processRetries());
       return new Response(
@@ -222,6 +255,19 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ success: false, error: "Missing case_id" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify the caller owns this case
+    const { data: ownedCase, error: caseErr } = await userClient
+      .from('cases')
+      .select('id, user_id')
+      .eq('id', body.case_id)
+      .maybeSingle();
+    if (caseErr || !ownedCase || ownedCase.user_id !== callerId) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Forbidden: you do not own this case' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
