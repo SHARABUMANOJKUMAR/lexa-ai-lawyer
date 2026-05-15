@@ -1,7 +1,8 @@
 project_id = "ratlfzpryvunqzqmbuvk"
 
 [functions.legal-chat]
-# JWT verification enabled by default (secure)
+# Auth is enforced in code; disable platform JWT so /health can be polled unauthenticated
+verify_jwt = false
 
 [functions.analyze-evidence]
 # JWT verification enabled by default (secure)
