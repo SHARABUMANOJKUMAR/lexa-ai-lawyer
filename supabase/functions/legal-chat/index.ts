@@ -180,6 +180,21 @@ serve(async (req) => {
   }
 
   try {
+    // Public health check — no auth required so the UI can poll reachability
+    const url = new URL(req.url);
+    if (req.method === "GET" || url.pathname.endsWith("/health")) {
+      const hasKey = !!Deno.env.get("LOVABLE_API_KEY");
+      return new Response(JSON.stringify({
+        status: hasKey ? "OK" : "DEGRADED",
+        service: "legal-chat",
+        ai_configured: hasKey,
+        timestamp: new Date().toISOString(),
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Verify authentication
     const authHeader = req.headers.get('authorization');
     if (!authHeader) {
