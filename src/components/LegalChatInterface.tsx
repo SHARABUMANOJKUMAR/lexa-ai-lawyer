@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AgentNetwork } from "@/components/AgentNetwork";
+import { ChatStatusIndicator } from "@/components/ChatStatusIndicator";
 import { useChat, ChatMessage } from "@/hooks/useChat";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -460,6 +461,7 @@ export const LegalChatInterface: React.FC = () => {
             <span className="text-sm font-medium">Active AI Agents</span>
           </div>
           <div className="flex items-center gap-2">
+            <ChatStatusIndicator />
             <Badge variant="gold" className="text-xs">
               Multi-Agent System
             </Badge>
