@@ -14,8 +14,9 @@ export default {
     },
     extend: {
       fontFamily: {
-        serif: ["'Playfair Display'", "Georgia", "serif"],
+        serif: ["'Poppins'", "'Playfair Display'", "Georgia", "serif"],
         sans: ["'Inter'", "system-ui", "sans-serif"],
+        display: ["'Poppins'", "'Inter'", "system-ui", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -92,6 +93,9 @@ export default {
         card: "var(--shadow-card)",
       },
       backgroundImage: {
+        "gradient-primary": "var(--gradient-primary)",
+        "gradient-sky": "var(--gradient-sky)",
+        "gradient-mesh": "var(--gradient-mesh)",
         "gradient-gold": "var(--gradient-gold)",
         "gradient-navy": "var(--gradient-navy)",
         "gradient-hero": "var(--gradient-hero)",
