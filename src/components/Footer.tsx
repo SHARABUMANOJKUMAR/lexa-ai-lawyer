@@ -21,7 +21,7 @@ const YouTubeIcon: React.FC = () => (
 );
 
 export const Footer: React.FC = () => {
-  return <footer className="relative bg-white border-t border-border overflow-hidden">
+  return <footer className="relative bg-background border-t border-border overflow-hidden">
       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-purple-500 to-accent" />
       <div className="absolute -top-32 -left-24 blob w-96 h-96 bg-primary/20" />
       <div className="absolute -bottom-32 -right-24 blob w-96 h-96 bg-purple-400/20" />

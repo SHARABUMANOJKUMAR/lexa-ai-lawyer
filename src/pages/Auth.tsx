@@ -57,11 +57,12 @@ const registerSchema = z.object({
 
 const Auth: React.FC = () => {
   const navigate = useNavigate();
-  const { user, signIn, signUp, loading } = useAuth();
-  const [mode, setMode] = useState<"login" | "register">("login");
+  const { user, signIn, signUp, loading, signInWithGoogle, setupRecaptcha, requestOTP, verifyOTP } = useAuth();
+  const [mode, setMode] = useState<"login" | "register" | "phone">("login");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [confirmationResult, setConfirmationResult] = useState<any>(null);
   
   const [formData, setFormData] = useState({
     email: "",
@@ -69,6 +70,7 @@ const Auth: React.FC = () => {
     fullName: "",
     phone: "",
     confirmPassword: "",
+    otp: "",
   });
 
   // Redirect if already logged in
@@ -77,6 +79,10 @@ const Auth: React.FC = () => {
       navigate("/dashboard");
     }
   }, [user, loading, navigate]);
+
+  useEffect(() => {
+    setupRecaptcha("recaptcha-container");
+  }, [setupRecaptcha]);
 
   const updateField = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -111,7 +117,7 @@ const Auth: React.FC = () => {
         );
 
         if (error) {
-          if (error.message.includes("already registered")) {
+          if (error.message.includes("already-in-use")) {
             toast.error("This email is already registered. Please login instead.");
           } else {
             toast.error(error.message);
@@ -124,6 +130,36 @@ const Auth: React.FC = () => {
           description: "Welcome to AI LeXa Lawyer.",
         });
         navigate("/dashboard");
+      } else if (mode === "phone") {
+        if (!confirmationResult) {
+          if (!formData.phone) {
+            setErrors({ phone: "Phone number is required" });
+            setIsSubmitting(false);
+            return;
+          }
+          const { error, confirmationResult: cr } = await requestOTP(formData.phone);
+          if (error) {
+            toast.error(error.message);
+            setIsSubmitting(false);
+            return;
+          }
+          setConfirmationResult(cr);
+          toast.success("OTP sent successfully");
+        } else {
+          if (!formData.otp) {
+            setErrors({ otp: "OTP is required" });
+            setIsSubmitting(false);
+            return;
+          }
+          const { error } = await verifyOTP(confirmationResult, formData.otp);
+          if (error) {
+            toast.error(error.message);
+            setIsSubmitting(false);
+            return;
+          }
+          toast.success("Login successful!");
+          navigate("/dashboard");
+        }
       } else {
         const validation = loginSchema.safeParse(formData);
         if (!validation.success) {
@@ -141,7 +177,7 @@ const Auth: React.FC = () => {
         const { error } = await signIn(formData.email, formData.password);
 
         if (error) {
-          if (error.message.includes("Invalid login")) {
+          if (error.message.includes("invalid-credential")) {
             toast.error("Invalid email or password. Please try again.");
           } else {
             toast.error(error.message);
@@ -160,6 +196,26 @@ const Auth: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleGoogleSignIn = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    const { error } = await signInWithGoogle();
+    if (error) {
+      if (error.message.includes("popup-closed-by-user") || error.message.includes("cancelled-popup-request")) {
+        // User closed the popup or multiple requests were made, no need to show an error
+        console.warn("Google Sign-In popup closed or cancelled.");
+      } else {
+        toast.error(error.message);
+      }
+    } else {
+      toast.success("Login successful!", {
+        description: "Welcome to AI LeXa Lawyer.",
+      });
+      navigate("/dashboard");
+    }
+    setIsSubmitting(false);
   };
 
   if (loading) {
@@ -207,7 +263,7 @@ const Auth: React.FC = () => {
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
               }`}
-              onClick={() => setMode("login")}
+              onClick={() => { setMode("login"); setConfirmationResult(null); }}
             >
               Login
             </button>
@@ -217,7 +273,7 @@ const Auth: React.FC = () => {
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
               }`}
-              onClick={() => setMode("register")}
+              onClick={() => { setMode("register"); setConfirmationResult(null); }}
             >
               Register
             </button>
@@ -245,111 +301,159 @@ const Auth: React.FC = () => {
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => updateField("email", e.target.value)}
-                  className={`w-full bg-muted border rounded-lg pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                    errors.email ? "border-destructive" : "border-primary/30"
-                  }`}
-                  placeholder="your.email@example.com"
-                />
-              </div>
-              {errors.email && (
-                <p className="text-xs text-destructive mt-1">{errors.email}</p>
-              )}
-            </div>
-
-            {mode === "register" && (
-              <div className="animate-fade-in">
-                <label className="block text-sm font-medium mb-2">Phone Number (Optional)</label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => updateField("phone", e.target.value)}
-                    className="w-full bg-muted border border-primary/30 rounded-lg pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50"
-                    placeholder="+91 XXXXX XXXXX"
-                  />
+            {mode !== "phone" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Email Address</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => updateField("email", e.target.value)}
+                      className={`w-full bg-muted border rounded-lg pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                        errors.email ? "border-destructive" : "border-primary/30"
+                      }`}
+                      placeholder="your.email@example.com"
+                    />
+                  </div>
+                  {errors.email && (
+                    <p className="text-xs text-destructive mt-1">{errors.email}</p>
+                  )}
                 </div>
-              </div>
-            )}
 
-            <div>
-              <label className="block text-sm font-medium mb-2">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={formData.password}
-                  onChange={(e) => updateField("password", e.target.value)}
-                  className={`w-full bg-muted border rounded-lg pl-11 pr-11 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                    errors.password ? "border-destructive" : "border-primary/30"
-                  }`}
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-              {errors.password && (
-                <p className="text-xs text-destructive mt-1">{errors.password}</p>
-              )}
-            </div>
-
-            {mode === "register" && (
-              <div className="animate-fade-in">
-                <label className="block text-sm font-medium mb-2">Confirm Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={formData.confirmPassword}
-                    onChange={(e) => updateField("confirmPassword", e.target.value)}
-                    className={`w-full bg-muted border rounded-lg pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 ${
-                      errors.confirmPassword ? "border-destructive" : "border-primary/30"
-                    }`}
-                    placeholder="••••••••"
-                  />
-                </div>
-                {errors.confirmPassword && (
-                  <p className="text-xs text-destructive mt-1">{errors.confirmPassword}</p>
+                {mode === "register" && (
+                  <div className="animate-fade-in">
+                    <label className="block text-sm font-medium mb-2">Phone Number (Optional)</label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <input
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => updateField("phone", e.target.value)}
+                        className="w-full bg-muted border border-primary/30 rounded-lg pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                        placeholder="+91 XXXXX XXXXX"
+                      />
+                    </div>
+                  </div>
                 )}
-              </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Password</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={formData.password}
+                      onChange={(e) => updateField("password", e.target.value)}
+                      className={`w-full bg-muted border rounded-lg pl-11 pr-11 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                        errors.password ? "border-destructive" : "border-primary/30"
+                      }`}
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  {errors.password && (
+                    <p className="text-xs text-destructive mt-1">{errors.password}</p>
+                  )}
+                </div>
+
+                {mode === "register" && (
+                  <div className="animate-fade-in">
+                    <label className="block text-sm font-medium mb-2">Confirm Password</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={formData.confirmPassword}
+                        onChange={(e) => updateField("confirmPassword", e.target.value)}
+                        className={`w-full bg-muted border rounded-lg pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                          errors.confirmPassword ? "border-destructive" : "border-primary/30"
+                        }`}
+                        placeholder="••••••••"
+                      />
+                    </div>
+                    {errors.confirmPassword && (
+                      <p className="text-xs text-destructive mt-1">{errors.confirmPassword}</p>
+                    )}
+                  </div>
+                )}
+
+                {mode === "login" && (
+                  <div className="flex items-center justify-between text-sm">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" className="w-4 h-4 rounded border-primary/30 text-primary focus:ring-primary/50" />
+                      <span className="text-muted-foreground">Remember me</span>
+                    </label>
+                    <a href="#" className="text-primary hover:underline">
+                      Forgot password?
+                    </a>
+                  </div>
+                )}
+
+                {mode === "register" && (
+                  <div className="text-sm text-muted-foreground animate-fade-in">
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input type="checkbox" className="w-4 h-4 mt-0.5 rounded border-primary/30 text-primary focus:ring-primary/50" required />
+                      <span>
+                        I agree to the{" "}
+                        <a href="#" className="text-primary hover:underline">Terms of Service</a>
+                        {" "}and{" "}
+                        <a href="#" className="text-primary hover:underline">Privacy Policy</a>
+                      </span>
+                    </label>
+                  </div>
+                )}
+              </>
             )}
 
-            {mode === "login" && (
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" className="w-4 h-4 rounded border-primary/30 text-primary focus:ring-primary/50" />
-                  <span className="text-muted-foreground">Remember me</span>
-                </label>
-                <a href="#" className="text-primary hover:underline">
-                  Forgot password?
-                </a>
-              </div>
-            )}
-
-            {mode === "register" && (
-              <div className="text-sm text-muted-foreground animate-fade-in">
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <input type="checkbox" className="w-4 h-4 mt-0.5 rounded border-primary/30 text-primary focus:ring-primary/50" required />
-                  <span>
-                    I agree to the{" "}
-                    <a href="#" className="text-primary hover:underline">Terms of Service</a>
-                    {" "}and{" "}
-                    <a href="#" className="text-primary hover:underline">Privacy Policy</a>
-                  </span>
-                </label>
+            {mode === "phone" && (
+              <div className="animate-fade-in">
+                {!confirmationResult ? (
+                  <>
+                    <label className="block text-sm font-medium mb-2">Phone Number</label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <input
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => updateField("phone", e.target.value)}
+                        className={`w-full bg-muted border rounded-lg pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                          errors.phone ? "border-destructive" : "border-primary/30"
+                        }`}
+                        placeholder="+91 XXXXX XXXXX"
+                      />
+                    </div>
+                    {errors.phone && (
+                      <p className="text-xs text-destructive mt-1">{errors.phone}</p>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <label className="block text-sm font-medium mb-2">OTP</label>
+                    <div className="relative mt-4">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                      <input
+                        type="text"
+                        value={formData.otp}
+                        onChange={(e) => updateField("otp", e.target.value)}
+                        className={`w-full bg-muted border rounded-lg pl-11 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+                          errors.otp ? "border-destructive" : "border-primary/30"
+                        }`}
+                        placeholder="123456"
+                      />
+                    </div>
+                    {errors.otp && (
+                      <p className="text-xs text-destructive mt-1">{errors.otp}</p>
+                    )}
+                  </>
+                )}
               </div>
             )}
 
@@ -363,11 +467,11 @@ const Auth: React.FC = () => {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                  {mode === "login" ? "Signing in..." : "Creating account..."}
+                  {mode === "login" ? "Signing in..." : mode === "register" ? "Creating account..." : (confirmationResult ? "Verifying..." : "Sending OTP...")}
                 </>
               ) : (
                 <>
-                  {mode === "login" ? "Sign In" : "Create Account"}
+                  {mode === "login" ? "Sign In" : mode === "register" ? "Create Account" : (confirmationResult ? "Verify OTP" : "Send OTP")}
                   <ArrowRight className="w-5 h-5 ml-2" />
                 </>
               )}
@@ -384,6 +488,33 @@ const Auth: React.FC = () => {
             </div>
           </div>
 
+          <div className="space-y-3 mb-6">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              size="lg"
+              onClick={handleGoogleSignIn}
+              disabled={isSubmitting}
+            >
+              Continue with Google
+            </Button>
+            {mode !== "phone" && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                size="lg"
+                onClick={() => { setMode("phone"); setConfirmationResult(null); }}
+                disabled={isSubmitting}
+              >
+                Continue with Phone
+              </Button>
+            )}
+          </div>
+
+          <div id="recaptcha-container"></div>
+
           {/* Switch Mode */}
           <p className="text-center text-sm text-muted-foreground">
             {mode === "login" ? (
@@ -391,21 +522,32 @@ const Auth: React.FC = () => {
                 Don't have an account?{" "}
                 <button
                   type="button"
-                  onClick={() => setMode("register")}
+                  onClick={() => { setMode("register"); setConfirmationResult(null); }}
                   className="text-primary hover:underline font-medium"
                 >
                   Register now
                 </button>
               </>
-            ) : (
+            ) : mode === "register" ? (
               <>
                 Already have an account?{" "}
                 <button
                   type="button"
-                  onClick={() => setMode("login")}
+                  onClick={() => { setMode("login"); setConfirmationResult(null); }}
                   className="text-primary hover:underline font-medium"
                 >
                   Sign in
+                </button>
+              </>
+            ) : (
+              <>
+                Back to{" "}
+                <button
+                  type="button"
+                  onClick={() => { setMode("login"); setConfirmationResult(null); }}
+                  className="text-primary hover:underline font-medium"
+                >
+                  Login
                 </button>
               </>
             )}

@@ -205,16 +205,24 @@ serve(async (req) => {
       });
     }
 
-    // Verify user with Supabase
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      global: { headers: { Authorization: authHeader } }
-    });
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      console.error("Auth error:", authError);
+    // We migrated to Firebase Auth, so we parse the Firebase JWT
+    const token = authHeader.replace('Bearer ', '');
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return new Response(JSON.stringify({ error: "Invalid authentication token format" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
+    let userId = "anonymous";
+    try {
+      const base64Url = parts[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(base64));
+      userId = payload.user_id || payload.sub;
+    } catch (e) {
+      console.error("Failed to parse JWT:", e);
       return new Response(JSON.stringify({ error: "Invalid authentication" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -222,7 +230,7 @@ serve(async (req) => {
     }
 
     // Check rate limit
-    const rateLimitResult = checkRateLimit(user.id);
+    const rateLimitResult = checkRateLimit(userId);
     if (!rateLimitResult.allowed) {
       console.warn("Rate limit exceeded for user:", user.id);
       return new Response(JSON.stringify({ 

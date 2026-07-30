@@ -141,9 +141,14 @@ export const useChat = () => {
 
     while (retryCount < MAX_RETRIES && !success) {
       try {
-        const accessToken = session?.access_token;
-        if (!accessToken) {
+        const currentUser = user;
+        if (!currentUser) {
           throw new Error('Please sign in to continue');
+        }
+        
+        const accessToken = await currentUser.getIdToken();
+        if (!accessToken) {
+          throw new Error('Failed to get authentication token');
         }
 
         // Prepare messages for API
